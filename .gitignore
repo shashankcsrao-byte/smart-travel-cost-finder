@@ -6,3 +6,4 @@ travel_history.db
 .env
 scrollcraft/builds/*/node_modules/
 tools/vendor/node_modules/
+.coverage
