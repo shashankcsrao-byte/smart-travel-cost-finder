@@ -816,7 +816,7 @@
     active: false, running: false, els: {}, edges: [], seq: 0, dragging: false, playing: false, pops: {},
   };
   const peak = $("#dijkstra");
-  const stage = $("[data-sc-stage]", peak);
+  const stage = $("[data-stage]", peak);
   const svg = $("#metro");
   const NS = "http://www.w3.org/2000/svg";
   const A = 0.03, B = 0.82, DONE = 0.86;      // event window and "route found" point in act progress
@@ -961,7 +961,7 @@
   }
 
   function progress() {
-    const v = parseFloat(peak.style.getPropertyValue("--sc-p"));
+    const v = parseFloat(peak.style.getPropertyValue("--p"));
     if (!Number.isNaN(v)) return v;
     const r = peak.getBoundingClientRect();
     return Math.min(1, Math.max(0, -r.top / Math.max(1, r.height - innerHeight)));
@@ -987,7 +987,7 @@
     if (!P.dragging) $("#trace-range").value = String(Math.round(p * 1000));
     if (!force && k === P.step && done === P.done) return;
     P.step = k; P.done = done;
-    stage.setAttribute("data-sc-verify-state", `${k}|${done ? 1 : 0}`);
+    stage.setAttribute("data-verify-state", `${k}|${done ? 1 : 0}`);
 
     const settled = new Set(), frontier = new Set();
     for (let i = 0; i <= k; i++) {
@@ -1207,7 +1207,7 @@
     if ("scrollRestoration" in history) history.scrollRestoration = "manual";
     if (!location.hash) scrollTo(0, 0);
     hydrateIcons();
-    if (window.ScrollCraft) S.sc = window.ScrollCraft.mount(document.body);
+    if (window.Motion) S.sc = window.Motion.mount(document.body);
     if ("ResizeObserver" in window) new ResizeObserver(relayout).observe($("main"));
 
     S.priority = store.get("stcf-priority", "cheapest");
