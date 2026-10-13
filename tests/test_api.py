@@ -19,7 +19,7 @@ def client(tmp_path):
 
 def test_health(client):
     body = client.get("/api/health").json()
-    assert body == {"status": "ok", "locations": 12, "connections": 47}
+    assert body["status"] == "ok" and body["locations"] == 12 and body["connections"] == 47
 
 
 def test_locations_have_coordinates(client):
@@ -38,11 +38,13 @@ def test_routes_college_to_airport(client):
     response = client.get("/api/routes", params={"source": "College", "destination": "Airport"})
     assert response.status_code == 200
     body = response.json()
-    assert [(o["mode"], o["fare"]) for o in body["options"]] == [
-        ("bus", 57), ("metro", 91), ("bike_taxi", 212), ("car_taxi", 390),
-    ]
+    cheapest_rows = [(o["mode"], o["fare"]) for o in body["options"] if o["variant"] == "cheapest"]
+    assert cheapest_rows == [("bus", 57), ("metro", 91), ("bike_taxi", 212), ("car_taxi", 390)]
+    # The car has a quicker (longer) route: it is listed too and is the single fastest.
     assert body["cheapest_mode"] == "bus"
-    assert body["fastest_mode"] == "metro"
+    assert body["fastest_mode"] == "car_taxi_fastest"
+    assert sum(o["is_fastest"] for o in body["options"]) == 1
+    assert sum(o["is_cheapest"] for o in body["options"]) == 1
     bus = body["options"][0]
     assert bus["is_cheapest"] and not bus["is_fastest"]
     assert bus["path"][0] == "College" and bus["path"][-1] == "Airport"
@@ -89,7 +91,9 @@ def test_history_records_searches_and_can_be_cleared(client):
     assert history["recent"][0]["cheapest_mode"] == "bus"
     assert history["popular"][0] == {"source": "College", "destination": "Airport", "searches": 2}
 
-    assert client.delete("/api/history").json() == {"cleared": True}
+    assert client.delete("/api/history").status_code == 403          # needs the custom header
+    headers = {"X-Requested-With": "smart-travel"}
+    assert client.delete("/api/history", headers=headers).json() == {"cleared": True}
     assert client.get("/api/history").json() == {"recent": [], "popular": []}
 
 

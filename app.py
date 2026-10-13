@@ -22,7 +22,8 @@ st.set_page_config(
     layout="wide",
 )
 
-MODE_ICONS = {"bus": "🚌", "metro": "🚇", "bike_taxi": "🏍️", "car_taxi": "🚕"}
+MODE_ICONS = {"bus": "🚌", "metro": "🚇", "bike_taxi": "🏍️", "car_taxi": "🚕", "mixed": "🔀"}
+PRIORITY_LABELS = {"cheapest": "Cheapest", "balanced": "Balanced", "fastest": "Fastest"}
 
 # ---------------------------------------------------------------------------
 # Styling: white, orange and charcoal
@@ -91,11 +92,14 @@ st.markdown(
 # ---------------------------------------------------------------------------
 # Journey input
 # ---------------------------------------------------------------------------
-col_src, col_dst, col_btn = st.columns([2, 2, 1], vertical_alignment="bottom")
+col_src, col_dst, col_pri, col_btn = st.columns([2, 2, 2, 1], vertical_alignment="bottom")
 with col_src:
     source = st.selectbox("Source", LOCATIONS, index=LOCATIONS.index("College"))
 with col_dst:
     destination = st.selectbox("Destination", LOCATIONS, index=LOCATIONS.index("Airport"))
+with col_pri:
+    priority = st.segmented_control("Priority", list(PRIORITY_LABELS), default="cheapest",
+                                    format_func=PRIORITY_LABELS.get) or "cheapest"
 with col_btn:
     if st.button("Find Routes", type="primary", width="stretch"):
         st.session_state.query = (source, destination)
@@ -103,7 +107,7 @@ with col_btn:
 query = st.session_state.get("query")
 
 
-def card_html(option, rank, is_cheapest, is_fastest):
+def card_html(option, rank, is_cheapest, is_fastest, priority):
     badges = ""
     if is_cheapest:
         badges += '<span class="badge cheap">CHEAPEST</span>'
@@ -112,8 +116,8 @@ def card_html(option, rank, is_cheapest, is_fastest):
     stops = " &rarr; ".join(f"<b>{escape(p)}</b>" for p in option.path)
     return f"""
 <div class="card {'best' if is_cheapest else ''}">
-  <div class="rank">#{rank} &middot; SORTED BY FARE</div>
-  <div class="mode">{MODE_ICONS[option.mode]} {escape(option.label)} {badges}</div>
+  <div class="rank">#{rank} &middot; SORTED BY {PRIORITY_LABELS[priority].upper()}</div>
+  <div class="mode">{MODE_ICONS.get(option.mode, "")} {escape(option.label)} {badges}</div>
   <div class="fare">{format_rupees(option.fare)}</div>
   <div class="metrics"><span>📏 {format_km(option.distance_km)}</span>
        <span>⏱️ {format_minutes(option.time_min)}</span>
@@ -150,7 +154,7 @@ if query is None:
     )
 else:
     src, dst = query
-    comparison = compare_routes(graph, src, dst)
+    comparison = compare_routes(graph, src, dst, priority=priority)
     st.subheader(f"{src}  →  {dst}")
 
     if comparison.same_location:
@@ -159,13 +163,11 @@ else:
     elif not comparison.options:
         st.error("No transport mode can reach this destination in the sample network.")
     else:
-        cheapest_modes = {o.mode for o in comparison.tied_cheapest}
-        fastest_modes = {o.mode for o in comparison.tied_fastest}
-        cheapest, fastest = comparison.cheapest, comparison.fastest
+        cheapest, fastest = comparison.cheapest, comparison.fastest   # exactly one each
 
         tie_note = ""
         if len(comparison.tied_cheapest) > 1:
-            tie_note = " (tie: " + ", ".join(o.label for o in comparison.tied_cheapest) + ")"
+            tie_note = " (same fare: " + ", ".join(o.label for o in comparison.tied_cheapest) + ")"
         st.markdown(
             f"""<div class="summary">💡 <b>Recommendation:</b> the cheapest option is
             <b>{escape(cheapest.label)}</b> at <b>{format_rupees(cheapest.fare)}</b>{escape(tie_note)}.
@@ -181,14 +183,15 @@ else:
         m1.metric(f"Cheapest fare · {cheapest.label}", format_rupees(cheapest.fare))
         m2.metric(f"Fastest time · {fastest.label}", format_minutes(fastest.time_min))
         m3.metric("Shortest distance", format_km(min(o.distance_km for o in comparison.options)))
-        m4.metric("Modes available", f"{len(comparison.options)} / {len(MODES)}")
+        available = {o.mode for o in comparison.options if o.mode in MODES}
+        m4.metric("Modes available", f"{len(available)} / {len(MODES)}")
 
-        cols = st.columns(len(MODES))
-        cards = [card_html(o, i, o.mode in cheapest_modes, o.mode in fastest_modes)
+        cards = [card_html(o, i, o.id == cheapest.id, o.id == fastest.id, priority)
                  for i, o in enumerate(comparison.options, start=1)]
         cards += [unavailable_html(m) for m in comparison.unavailable]
-        for col, html in zip(cols, cards):
-            col.markdown(html, unsafe_allow_html=True)
+        for start in range(0, len(cards), 4):            # rows of four cards
+            for col, html in zip(st.columns(4), cards[start:start + 4]):
+                col.markdown(html, unsafe_allow_html=True)
 
         st.markdown("#### Comparison table")
         st.dataframe(
@@ -218,17 +221,22 @@ else:
             st.pyplot(fig)
             plt.close(fig)
         with legs_col:
-            st.markdown(f"**{MODE_ICONS[chosen.mode]} {chosen.label}: leg-by-leg**")
+            st.markdown(f"**{MODE_ICONS.get(chosen.mode, '')} {chosen.label}: leg-by-leg**")
             st.dataframe(
                 [
-                    {"From": a, "To": e.to, "km": e.distance_km, "min": e.time_min}
+                    {"From": a, "To": e.to, "Mode": mode_label(e.mode), "km": e.distance_km, "min": e.time_min}
                     for a, e in zip(chosen.path, chosen.edges)
                 ],
                 hide_index=True,
                 width="stretch",
             )
-            rule = FARE_RULES[chosen.mode]
-            st.markdown(
+            if chosen.legs:                                   # Smart mix: one fare per boarding
+                st.markdown("**Fare calculation** (a base fare each time you board)\n\n" + "\n\n".join(
+                    f"{leg['label']}: ₹{FARE_RULES[leg['mode']]['base']} + ₹{FARE_RULES[leg['mode']]['per_km']}"
+                    f" × {leg['distance_km']:g} km = {format_rupees(leg['fare'])}" for leg in chosen.legs)
+                    + f"\n\n**Total {format_rupees(chosen.fare)}**")
+            rule = FARE_RULES.get(chosen.mode)
+            if rule: st.markdown(
                 f"""**Fare calculation** (base fare charged once)
 
 `base + per_km × distance` = ₹{rule['base']} + ₹{rule['per_km']} × {chosen.distance_km:g} km

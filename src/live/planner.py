@@ -1,27 +1,30 @@
 """
 Live trip planner for Bengaluru.
 
-For one origin and destination it builds an option per transport type:
+For one origin, destination and departure time it builds an option per mode:
 
+    Walk       short trips only, free
     Auto       live road route (Ola Maps) + Govt auto meter fare
     Cab        live road route (Ola Maps) + Govt-notified cab fare
     Bike taxi  live road route (Ola Maps) + indicative fare
     Bus        live road time x slowdown + BMTC stage fare (estimate)
-    Metro      walk/auto to a station + OUR Dijkstra on the real metro graph
+    Metro      walk/auto to a station + timetable Dijkstra on the REAL train times
                + official BMRCL fare + walk/auto from the exit station
 
-Options are ranked by fare (then time), exactly like the offline version.
+Options are ranked by the visitor's priority (cheapest, balanced or fastest).
+Exactly one option is marked cheapest and exactly one fastest.
 """
 
 import json
-from datetime import datetime
+from datetime import datetime, timedelta
 from urllib.parse import urlencode
 
+from ..routing import MINUTE_VALUE
 from . import fares as F
 from .metro import IST, haversine_km
 from .olamaps import OlaMapsError
 
-MODE_ORDER = ("bus", "metro", "auto", "bike_taxi", "cab")
+MODE_ORDER = ("walk", "bus", "metro", "auto", "bike_taxi", "cab")
 
 
 # ---------------------------------------------------------------- deep links
@@ -33,18 +36,31 @@ def uber_link(origin, destination):
     return "https://m.uber.com/looking?" + urlencode({"pickup": place(origin), "drop[0]": place(destination)})
 
 
-def maps_transit_link(origin, destination):
-    """Google Maps URL (no API key needed) showing public-transport directions."""
+def maps_link(origin, destination, travelmode="transit"):
+    """Google Maps URL (no API key needed) for directions."""
     return "https://www.google.com/maps/dir/?" + urlencode({
         "api": 1, "origin": f"{origin['lat']},{origin['lng']}",
-        "destination": f"{destination['lat']},{destination['lng']}", "travelmode": "transit"})
+        "destination": f"{destination['lat']},{destination['lng']}", "travelmode": travelmode})
 
+
+maps_transit_link = maps_link          # backwards-compatible name
 
 APP_LINKS = {
     "namma_yatri": {"label": "Namma Yatri", "url": "https://nammayatri.in/"},
     "ola": {"label": "Ola", "url": "https://www.olacabs.com/"},
     "rapido": {"label": "Rapido", "url": "https://www.rapido.bike/"},
 }
+
+
+# ------------------------------------------------------------------- ranking
+
+def rank_key(option, priority="cheapest"):
+    order = MODE_ORDER.index(option["mode"])
+    if priority == "fastest":
+        return (option["time_min"], option["fare"], order)
+    if priority == "balanced":
+        return (round(option["fare"] + MINUTE_VALUE["balanced"] * option["time_min"], 6), option["fare"], order)
+    return (option["fare"], option["time_min"], order)
 
 
 # ------------------------------------------------------------------- helpers
@@ -54,7 +70,7 @@ def _leg(kind, start, end, km, minutes, **extra):
             "distance_km": round(km, 2), "time_min": round(minutes, 1), **extra}
 
 
-def _access_leg(kind_name, place_name, station, road, hour, towards_station):
+def _access_leg(place_name, station, road, hour, towards_station):
     """Walk if short, otherwise take an auto. Returns (leg, fare)."""
     start, end = (place_name, station["name"]) if towards_station else (station["name"], place_name)
     km = road["distance_km"]
@@ -72,19 +88,15 @@ def _approx_road(a, b):
 
 # -------------------------------------------------------------------- metro
 
-def plan_metro(maps, metro, origin, destination, now):
-    """Best (cheapest, then quickest) metro journey, or (None, reason)."""
-    if not metro.is_running(now):
-        first, last = metro.hours(now) or ("?", "?")
-        return None, f"Metro is not running now (trains run about {first}–{last})"
-
+def plan_metro(maps, metro, origin, destination, depart, priority="cheapest"):
+    """Best metro journey for the priority, using real train times. (option, reason)."""
     o_point, d_point = (origin["lat"], origin["lng"]), (destination["lat"], destination["lng"])
     starts = metro.nearest_stations(o_point, k=3)
     ends = metro.nearest_stations(d_point, k=3)
     if not starts or not ends:
         return None, "No metro station within 6 km of the start or the destination"
-    if starts[0][0]["id"] == ends[0][0]["id"]:
-        return None, f"Both places are closest to the same station ({starts[0][0]['name']}), so the metro does not help"
+    if {s["id"] for s, _ in starts} == {s["id"] for s, _ in ends}:
+        return None, "Both places are next to the same stations, so the metro does not help"
 
     station_point = lambda s: (s["lat"], s["lng"])
     approximate = False
@@ -93,42 +105,55 @@ def plan_metro(maps, metro, origin, destination, now):
         from_station = [row[0] for row in maps.distance_matrix([station_point(s) for s, _ in ends], [d_point])]
     except OlaMapsError:
         approximate = True
-        to_station = [None] * len(starts)
-        from_station = [None] * len(ends)
+        to_station, from_station = [None] * len(starts), [None] * len(ends)
 
-    hour = now.astimezone(IST).hour
-    best = None
+    hour = depart.astimezone(IST).hour
+    minute_value = MINUTE_VALUE[priority]
+    best, waits = None, []
     for (a, _), road_a in zip(starts, to_station):
         road_a = road_a or _approx_road(o_point, station_point(a))
+        first_leg, first_fare = _access_leg(origin["name"], a, road_a, hour, True)
+        at_station = depart + timedelta(minutes=first_leg["time_min"])
         for (b, _), road_b in zip(ends, from_station):
-            road_b = road_b or _approx_road(station_point(b), d_point)
             if a["id"] == b["id"]:
                 continue
-            journey = metro.route(a["id"], b["id"])
-            fare_info = metro.fare(a["id"], b["id"], now)
-            if journey is None or fare_info["token"] is None:
+            road_b = road_b or _approx_road(station_point(b), d_point)
+            journey = metro.journey(a["id"], b["id"], at_station)
+            if journey is None or journey["first_wait_min"] > F.MAX_TRAIN_WAIT_MIN:
+                waits.append((a, at_station))
                 continue
-            first_leg, first_fare = _access_leg("access", origin["name"], a, road_a, hour, True)
-            last_leg, last_fare = _access_leg("egress", destination["name"], b, road_b, hour, False)
+            fare_info = metro.fare(a["id"], b["id"], at_station)
+            if fare_info["token"] is None:
+                continue
+            last_leg, last_fare = _access_leg(destination["name"], b, road_b, hour, False)
             total_fare = fare_info["token"] + first_fare + last_fare
             total_time = first_leg["time_min"] + journey["time_min"] + last_leg["time_min"]
-            candidate = (total_fare, total_time, first_leg, journey, fare_info, last_leg)
-            if best is None or candidate[:2] < best[:2]:
-                best = candidate
+            score = (total_fare + minute_value * total_time, total_time)
+            if best is None or score < best[0]:
+                best = (score, total_fare, total_time, first_leg, journey, fare_info, last_leg)
 
     if best is None:
-        return None, "The start and destination are closest to the same metro station"
+        if waits:
+            station, at_station = waits[0]
+            when = metro.next_departure(station["id"], at_station)
+            return None, (f"No metro train soon from {station['name']}"
+                          + (f". Next train at {when}" if when else ". No more trains today"))
+        return None, "No useful metro route between these places"
 
-    total_fare, total_time, first_leg, journey, fare_info, last_leg = best
+    _score, total_fare, total_time, first_leg, journey, fare_info, last_leg = best
     legs = [first_leg]
     for ride in journey["rides"]:
         legs.append(_leg("metro", ride["from"], ride["to"], ride["distance_km"], ride["time_min"],
                          line=ride["line_name"], color=ride["color"], stops=ride["stops"], coords=ride["coords"],
-                         from_id=ride["stations"][0], to_id=ride["stations"][-1]))
+                         from_id=ride["stations"][0], to_id=ride["stations"][-1],
+                         depart=ride["depart"], arrive=ride["arrive"]))
     legs.append(last_leg)
 
-    notes = [f"Metro time includes about {round(journey['time_min'] - sum(r['time_min'] for r in journey['rides']))} min "
-             f"of average waiting{' and ' + str(journey['changes']) + ' line change(s)' if journey['changes'] else ''}."]
+    rides = journey["rides"]
+    notes = [f"Real timetable: board at {rides[0]['depart']}"
+             + (f" (about {round(journey['first_wait_min'])} min wait)" if journey["first_wait_min"] >= 1 else "")
+             + (f", {journey['changes']} line change(s)" if journey["changes"] else "")
+             + f", arrive {rides[-1]['arrive']}."]
     if fare_info["smart_card"]:
         notes.append(f"Smart card: ₹{fare_info['smart_card']:g} ({fare_info['timeframe']}) instead of ₹{fare_info['token']:g}.")
     if first_leg["kind"] == "auto" or last_leg["kind"] == "auto":
@@ -136,29 +161,39 @@ def plan_metro(maps, metro, origin, destination, now):
     if approximate:
         notes.append("Station access distances are approximate (map service unavailable).")
 
-    distance = sum(leg["distance_km"] for leg in legs)
+    auto_fares = first_leg.get("fare", 0) + last_leg.get("fare", 0)
     return {
         "mode": "metro", "label": "Namma Metro", "providers": "BMRCL",
         "fare": round(total_fare), "fare_kind": "official",
-        "fare_text": f"₹{fare_info['token']:g} metro" + (f" + ₹{first_leg.get('fare', 0) + last_leg.get('fare', 0)} auto"
-                                                         if first_leg["kind"] == "auto" or last_leg["kind"] == "auto" else ""),
+        "fare_text": f"₹{fare_info['token']:g} metro" + (f" + ₹{auto_fares} auto" if auto_fares else ""),
         "fare_source": "Official BMRCL station-to-station fare (Namma Metro GTFS)",
-        "distance_km": round(distance, 2), "time_min": round(total_time, 1),
+        "distance_km": round(sum(leg["distance_km"] for leg in legs), 2), "time_min": round(total_time, 1),
         "legs": legs, "notes": notes,
-        "links": [{"label": "Directions in Google Maps", "url": maps_transit_link(origin, destination)}],
+        "links": [{"label": "Directions in Google Maps", "url": maps_link(origin, destination)}],
     }, None
 
 
 # --------------------------------------------------------------------- plan
 
-def plan_trip(maps, metro, origin, destination, now=None):
-    now = now or datetime.now(IST)
-    hour = now.astimezone(IST).hour
+def plan_trip(maps, metro, origin, destination, now=None, priority="cheapest"):
+    depart = (now or datetime.now(IST)).astimezone(IST)
+    hour = depart.hour
     road = maps.directions((origin["lat"], origin["lng"]), (destination["lat"], destination["lng"]))
     km, minutes = road["distance_km"], road["duration_min"]
     road_leg = _leg("road", origin["name"], destination["name"], km, minutes, polyline=road["polyline"])
 
     options, unavailable = [], []
+
+    if km <= F.WALK_OPTION_MAX_KM:
+        options.append({
+            "mode": "walk", "label": "Walk", "providers": "On foot",
+            "fare": 0, "fare_kind": "free", "fare_text": "Free",
+            "fare_source": f"Walking at {F.WALK_KMPH:g} km/h along the road route.",
+            "distance_km": km, "time_min": F.walk_minutes(km),
+            "legs": [{**road_leg, "kind": "walk", "time_min": F.walk_minutes(km)}],
+            "notes": ["Short trip: walking is free and often as quick as waiting for a ride."],
+            "links": [{"label": "Walking directions", "url": maps_link(origin, destination, "walking")}],
+        })
 
     auto, night = F.auto_fare(km, hour)
     options.append({
@@ -197,36 +232,38 @@ def plan_trip(maps, metro, origin, destination, now=None):
         "legs": [{**road_leg, "kind": "bus", "time_min": bus_time}],
         "notes": [f"Estimated: road time × {F.BUS_SLOWDOWN} + {F.BUS_AVG_WAIT_MIN:g} min average wait. "
                   "Actual routes may need a change of bus."],
-        "links": [{"label": "Bus routes in Google Maps", "url": maps_transit_link(origin, destination)}],
+        "links": [{"label": "Bus routes in Google Maps", "url": maps_link(origin, destination)}],
     })
 
     if metro is None:
         unavailable.append({"mode": "metro", "label": "Namma Metro", "reason": "Metro data not loaded"})
     else:
-        metro_option, reason = plan_metro(maps, metro, origin, destination, now)
+        metro_option, reason = plan_metro(maps, metro, origin, destination, depart, priority)
         if metro_option:
             options.append(metro_option)
         else:
             unavailable.append({"mode": "metro", "label": "Namma Metro", "reason": reason})
 
-    options.sort(key=lambda o: (o["fare"], o["time_min"], MODE_ORDER.index(o["mode"])))
-    best_fare = options[0]["fare"]
-    best_time = min(o["time_min"] for o in options)
-    fastest = min(options, key=lambda o: (o["time_min"], o["fare"], MODE_ORDER.index(o["mode"])))
+    options.sort(key=lambda o: rank_key(o, priority))
+    cheapest = min(options, key=lambda o: rank_key(o, "cheapest"))
+    fastest = min(options, key=lambda o: rank_key(o, "fastest"))
     for rank, option in enumerate(options, start=1):
         option["rank"] = rank
-        option["is_cheapest"] = option["fare"] == best_fare
-        option["is_fastest"] = option["time_min"] == best_time
+        option["id"] = option["mode"]
+        option["is_cheapest"] = option is cheapest
+        option["is_fastest"] = option is fastest
 
     return {
         "origin": origin, "destination": destination,
-        "generated_at": now.astimezone(IST).isoformat(timespec="seconds"),
+        "generated_at": datetime.now(IST).isoformat(timespec="seconds"),
+        "depart_at": depart.isoformat(timespec="minutes"),
+        "priority": priority,
         "road": {"distance_km": km, "duration_min": minutes, "polyline": road["polyline"]},
         "options": options, "unavailable": unavailable,
-        "cheapest_mode": options[0]["mode"], "fastest_mode": fastest["mode"],
+        "cheapest_mode": cheapest["mode"], "fastest_mode": fastest["mode"],
         "notes": [
             "Uber, Ola, Rapido and Namma Yatri do not share live prices with other apps; "
             "road fares are estimates from published rates.",
-            "Road times are live from Ola Maps. Metro data: BMRCL via Namma Metro GTFS (ODbL).",
+            "Road times are live from Ola Maps. Metro times use the real BMRCL timetable (Namma Metro GTFS, ODbL).",
         ],
     }

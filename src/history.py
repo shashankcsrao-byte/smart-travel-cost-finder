@@ -7,7 +7,10 @@ travel_history.db in the project folder).
 """
 
 import sqlite3
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
+
+MAX_ROWS = 500           # keep the newest rows only, so the file never grows forever
+REPEAT_WINDOW_S = 120    # the same search again within 2 minutes is not stored twice
 
 SCHEMA = """
 CREATE TABLE IF NOT EXISTS searches (
@@ -43,6 +46,24 @@ class HistoryStore:
         self.db_path = str(db_path)
         self._run(SCHEMA)
         self._run(LIVE_SCHEMA)
+        self._run("CREATE INDEX IF NOT EXISTS idx_searches_pair ON searches (source, destination)")
+
+    @staticmethod
+    def _now():
+        return datetime.now(timezone.utc)
+
+    def _is_repeat(self, table, where, params):
+        """True if the newest row of `table` is the same search, made very recently."""
+        rows = self._run(f"SELECT * FROM {table} ORDER BY id DESC LIMIT 1")
+        if not rows:
+            return False
+        row = rows[0]
+        same = all(row[col] == val for col, val in zip(where, params))
+        recent = self._now() - datetime.fromisoformat(row["searched_at"]) < timedelta(seconds=REPEAT_WINDOW_S)
+        return same and recent
+
+    def _trim(self, table):
+        self._run(f"DELETE FROM {table} WHERE id <= (SELECT MAX(id) FROM {table}) - ?", (MAX_ROWS,))
 
     def _run(self, sql, params=()):
         """Execute one SQL statement and return its rows as dictionaries.
@@ -60,13 +81,17 @@ class HistoryStore:
             conn.close()
 
     def add(self, source, destination, cheapest_mode=None, cheapest_fare=None):
-        timestamp = datetime.now(timezone.utc).isoformat(timespec="seconds")
+        if self._is_repeat("searches", ("source", "destination"), (source, destination)):
+            return False
+        timestamp = self._now().isoformat(timespec="seconds")
         # "?" placeholders prevent SQL injection.
         self._run(
             "INSERT INTO searches (source, destination, cheapest_mode, cheapest_fare, searched_at) "
             "VALUES (?, ?, ?, ?, ?)",
             (source, destination, cheapest_mode, cheapest_fare, timestamp),
         )
+        self._trim("searches")
+        return True
 
     def recent(self, limit=10):
         return self._run(
@@ -89,13 +114,18 @@ class HistoryStore:
 
     # ---- live mode (real places, stored with coordinates so they can be re-run) ----
     def add_live(self, origin, destination, cheapest_mode=None, cheapest_fare=None):
-        timestamp = datetime.now(timezone.utc).isoformat(timespec="seconds")
+        if self._is_repeat("live_searches", ("origin_name", "dest_name", "origin_lat", "dest_lat"),
+                           (origin["name"], destination["name"], origin["lat"], destination["lat"])):
+            return False
+        timestamp = self._now().isoformat(timespec="seconds")
         self._run(
             "INSERT INTO live_searches (origin_name, origin_lat, origin_lng, dest_name, dest_lat, dest_lng, "
             "cheapest_mode, cheapest_fare, searched_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
             (origin["name"], origin["lat"], origin["lng"], destination["name"], destination["lat"],
              destination["lng"], cheapest_mode, cheapest_fare, timestamp),
         )
+        self._trim("live_searches")
+        return True
 
     def recent_live(self, limit=6):
         rows = self._run(

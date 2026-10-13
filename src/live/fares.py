@@ -35,8 +35,9 @@ BIKE_TAXI = {
     "label": "Bike taxi",
     "kind": "indicative",
     "min_fare": 20, "min_km": 0, "per_km": 8,
-    "source": "No official bike-taxi rate card is published for Karnataka. "
-              "Indicative values only - edit src/live/fares.py.",
+    # Indicative values: change min_fare / per_km here if you find better data.
+    "source": "No official bike-taxi rate card is published for Karnataka, so this is an "
+              "indicative estimate. Check the app for the real price.",
 }
 
 BMTC_ORDINARY = {
@@ -56,6 +57,8 @@ BUS_SLOWDOWN = 1.5          # buses stop often and are slower than cars
 BUS_AVG_WAIT_MIN = 8.0
 WALK_KMPH = 4.5
 MAX_WALK_KM = 1.0           # longer first/last-mile legs use an auto
+WALK_OPTION_MAX_KM = 3.0    # offer "just walk" for trips up to this road distance
+MAX_TRAIN_WAIT_MIN = 45     # waiting longer than this for the first train = "no train now"
 
 
 def is_night(hour, rule=AUTO_METER):

@@ -141,7 +141,7 @@ def test_distance_matrix_parsing():
     assert row == [{"distance_km": 1.5, "duration_min": 5.0}, None]
 
 
-@pytest.mark.parametrize("status, message", [(401, "API key"), (429, "rate limit"), (500, "error 500")])
+@pytest.mark.parametrize("status, message", [(401, "map key"), (429, "busy"), (500, "error 500")])
 def test_errors_become_friendly_messages(status, message):
     client = fake_ola(lambda request: httpx.Response(status, json={}))
     with pytest.raises(OlaMapsError, match=message):
@@ -191,9 +191,12 @@ def test_metro_fare_matches_official_table(metro):
 
 
 @needs_metro
-def test_metro_operating_hours(metro):
-    assert metro.is_running(datetime(2026, 10, 13, 9, 0, tzinfo=IST))
-    assert not metro.is_running(datetime(2026, 10, 13, 2, 0, tzinfo=IST))
+def test_metro_timetable_respects_last_train(metro):
+    vij, majestic = station_id(metro, "Vijayanagar"), station_id(metro, "Majestic")
+    day = metro.journey(vij, majestic, datetime(2026, 10, 13, 9, 0, tzinfo=IST))
+    assert day is not None and day["timetable"] and day["rides"][0]["depart"] >= "09:00"
+    # Vijayanagar's last weekday trains leave about 23:27; at 23:40 there is none.
+    assert metro.journey(vij, majestic, datetime(2026, 10, 13, 23, 40, tzinfo=IST)) is None
 
 
 @needs_metro
@@ -292,7 +295,8 @@ def test_live_api_without_key_explains_setup(tmp_path):
     client = TestClient(create_app(db_path=tmp_path / "t.db", maps_client=None, metro=None))
     response = client.get("/api/live/places", params={"q": "MG Road"})
     assert response.status_code == 503
-    assert "OLA_MAPS_API_KEY" in response.json()["detail"]
+    assert "not set up" in response.json()["detail"]
+    assert ".env" not in response.json()["detail"]          # no server config hints to visitors
 
 
 @needs_metro
