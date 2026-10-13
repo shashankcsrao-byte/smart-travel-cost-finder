@@ -155,6 +155,8 @@ def create_app(db_path=None, maps_client="default", metro="default", allowed_hos
     metro_net = _default_metro() if metro == "default" else metro
     hosts = allowed_hosts or [h.strip() for h in os.environ.get(
         "ALLOWED_HOSTS", "localhost,127.0.0.1,[::1],testserver").split(",") if h.strip()]
+    if os.environ.get("RENDER_EXTERNAL_HOSTNAME"):          # e.g. smart-travel.onrender.com on Render
+        hosts.append(os.environ["RENDER_EXTERNAL_HOSTNAME"])
     limiters = {path: SlidingWindowLimiter(n, 60) for path, n in RATE_LIMITS.items()}
 
     @asynccontextmanager
@@ -448,5 +450,7 @@ if __name__ == "__main__":
     import uvicorn
 
     port = int(os.environ.get("PORT", 8000))
+    host = os.environ.get("HOST", "127.0.0.1")        # 0.0.0.0 on a server
     print(f"Smart Travel Cost Finder running at http://localhost:{port}  (API docs: /docs)")
-    uvicorn.run("src.server:create_app", factory=True, host="127.0.0.1", port=port)
+    uvicorn.run("src.server:create_app", factory=True, host=host, port=port,
+                proxy_headers=True, forwarded_allow_ips=os.environ.get("FORWARDED_ALLOW_IPS", "127.0.0.1"))

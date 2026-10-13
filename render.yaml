@@ -1,0 +1,16 @@
+# Render Blueprint: New > Blueprint > pick this repo. Render reads this file.
+services:
+  - type: web
+    name: smart-travel-cost-finder
+    runtime: python
+    plan: free
+    buildCommand: pip install -r requirements-deploy.txt
+    # --proxy-headers so rate limits see each visitor's real IP behind Render's proxy.
+    startCommand: uvicorn src.server:create_app --factory --host 0.0.0.0 --port $PORT --proxy-headers --forwarded-allow-ips "*"
+    healthCheckPath: /api/health
+    autoDeploy: true
+    envVars:
+      - key: OLA_MAPS_API_KEY
+        sync: false          # Render asks you to paste the key; it never goes in the repo
+      - key: PORT
+        value: "10000"
