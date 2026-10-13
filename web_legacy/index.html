@@ -1,0 +1,385 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Smart Travel Cost Finder</title>
+  <meta name="description" content="Compare the cheapest route by bus, metro, bike taxi and car taxi using Dijkstra's algorithm.">
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><circle cx='16' cy='16' r='14' fill='%2323252B'/><path d='M9 21 L16 9 L23 21' stroke='%23F26B1D' stroke-width='3.5' fill='none' stroke-linecap='round' stroke-linejoin='round'/></svg>">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.css">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body data-mode="demo">
+  <!-- ===================== Navigation ===================== -->
+  <header class="nav">
+    <div class="wrap nav-inner">
+      <a class="brand" href="#top" aria-label="Smart Travel Cost Finder home">
+        <span class="brand-mark" aria-hidden="true"></span>
+        <span>Smart Travel <b>Cost Finder</b></span>
+      </a>
+      <nav class="nav-links" aria-label="Sections">
+        <a href="#planner">Plan</a>
+        <a href="#results" id="nav-results" class="demo-only" hidden>Results</a>
+        <a href="#history" class="demo-only">History</a>
+        <a href="#learn">How it works</a>
+        <a href="/docs" target="_blank" rel="noopener">API</a>
+      </nav>
+    </div>
+  </header>
+
+  <main id="top">
+    <!-- ===================== Hero + planner ===================== -->
+    <section class="hero">
+      <div class="wrap">
+        <p class="eyebrow">Graph-based multi-modal transport cost optimization</p>
+        <h1>Find the <span>cheapest way</span> to get there.</h1>
+        <p class="lead">Compare bus, metro, bike taxi and car taxi side by side. Each route is computed
+          with a hand-written Dijkstra's algorithm over a weighted city graph.</p>
+        <span class="pill-note demo-only">Demo city · sample network · illustrative fares · not live data</span>
+        <span class="pill-note live-only">Live Bengaluru · Ola Maps traffic · real Namma Metro data · published fares</span>
+      </div>
+    </section>
+
+    <section class="wrap planner-wrap" id="planner">
+      <div class="mode-switch" role="tablist" aria-label="Data source">
+        <button type="button" class="mode-btn" data-mode="live" role="tab" aria-selected="false"><span class="live-dot"></span>Live Bengaluru</button>
+        <button type="button" class="mode-btn" data-mode="demo" role="tab" aria-selected="true">Demo city (offline)</button>
+      </div>
+
+      <!-- ---------- Live planner ---------- -->
+      <div id="live-panel" class="live-only">
+        <form class="planner live-planner" id="live-form" novalidate autocomplete="off">
+          <div class="field place-field">
+            <label for="live-from">From</label>
+            <div class="place-input">
+              <input id="live-from" type="text" placeholder="Search a place in Bengaluru" role="combobox"
+                     aria-expanded="false" aria-autocomplete="list" aria-controls="live-from-list">
+              <button type="button" class="locate" id="locate-btn" title="Use my current location" aria-label="Use my current location">◎</button>
+            </div>
+            <ul class="suggestions" id="live-from-list" role="listbox" hidden></ul>
+          </div>
+          <button type="button" class="swap" id="live-swap" aria-label="Swap start and destination" title="Swap">⇄</button>
+          <div class="field place-field">
+            <label for="live-to">To</label>
+            <div class="place-input">
+              <input id="live-to" type="text" placeholder="Search a place in Bengaluru" role="combobox"
+                     aria-expanded="false" aria-autocomplete="list" aria-controls="live-to-list">
+            </div>
+            <ul class="suggestions" id="live-to-list" role="listbox" hidden></ul>
+          </div>
+          <button type="submit" class="btn-primary" id="live-find">
+            <span class="btn-label">Find Routes</span>
+            <span class="spinner" aria-hidden="true"></span>
+          </button>
+        </form>
+        <p class="live-status" id="live-status"></p>
+        <div class="quick" id="live-recent"></div>
+        <div id="live-alert" class="alert" role="alert" hidden></div>
+        <div class="setup panel" id="live-setup" hidden>
+          <h3>Set up live mode (about 5 minutes)</h3>
+          <ol class="steps">
+            <li>Create a free account at <a href="https://maps.olakrutrim.com" target="_blank" rel="noopener">maps.olakrutrim.com</a> and create an <b>API key</b>.</li>
+            <li>In the project folder, copy <code>.env.example</code> to <code>.env</code> and paste the key:<br><code>OLA_MAPS_API_KEY=your-key-here</code></li>
+            <li>Restart the server (<code>python -m src.server</code>) and reload this page.</li>
+          </ol>
+          <p class="muted small">The key stays on your computer. The browser never sees it; the backend calls Ola Maps for you.
+            Meanwhile you can use the <b>Demo city</b>, which works fully offline.</p>
+        </div>
+      </div>
+
+      <!-- ---------- Demo planner ---------- -->
+      <div id="demo-panel" class="demo-only">
+      <form class="planner" id="planner-form" novalidate>
+        <div class="field">
+          <label for="source">From</label>
+          <select id="source" name="source" required disabled>
+            <option>Loading…</option>
+          </select>
+        </div>
+        <button type="button" class="swap" id="swap" aria-label="Swap source and destination" title="Swap">⇄</button>
+        <div class="field">
+          <label for="destination">To</label>
+          <select id="destination" name="destination" required disabled>
+            <option>Loading…</option>
+          </select>
+        </div>
+        <button type="submit" class="btn-primary" id="find-btn" disabled>
+          <span class="btn-label">Find Routes</span>
+          <span class="spinner" aria-hidden="true"></span>
+        </button>
+      </form>
+      <div class="quick">
+        <span>Try:</span>
+        <button type="button" class="chip" data-from="College" data-to="Airport">College → Airport</button>
+        <button type="button" class="chip" data-from="Hospital" data-to="Airport">Hospital → Airport</button>
+        <button type="button" class="chip" data-from="Market" data-to="Tech Park">Market → Tech Park</button>
+        <button type="button" class="chip" data-from="Residential Area" data-to="Railway Station">Residential Area → Railway Station</button>
+      </div>
+      <div id="alert" class="alert" role="alert" hidden></div>
+      </div>
+    </section>
+
+    <!-- ===================== Live results ===================== -->
+    <section class="wrap live-only" id="live-area">
+      <div class="empty" id="live-empty">
+        <div class="empty-icon" aria-hidden="true">📍</div>
+        <h2>Compare real routes across Bengaluru</h2>
+        <p>Search any two places. You get live road times from Ola Maps, real Namma Metro routes
+          (Dijkstra on the actual metro network) and fares from official or published rates, ranked from cheapest.</p>
+      </div>
+
+      <div id="live-results" hidden>
+        <div class="results-head">
+          <h2 id="live-title"></h2>
+          <span class="live-badge"><span class="live-dot"></span><span id="live-updated"></span></span>
+          <div class="head-actions">
+            <label class="toggle"><input type="checkbox" id="auto-refresh"> Auto-refresh every 2 min</label>
+            <button type="button" class="btn-ghost" id="live-refresh">↻ Refresh</button>
+          </div>
+        </div>
+        <div class="summary" id="live-summary"></div>
+        <div class="stats" id="live-stats"></div>
+
+        <h3 class="section-title">Options ranked by fare <small>Select a card to see it on the map · buttons open the app for the exact price</small></h3>
+        <div class="cards live-cards" id="live-cards"></div>
+
+        <div class="split">
+          <div class="panel map-panel">
+            <div class="panel-head"><h3 id="live-map-title">Route map</h3></div>
+            <div id="live-map" class="live-map" role="region" aria-label="Map of the selected route"></div>
+          </div>
+          <div class="panel details-panel">
+            <h3 id="live-details-title">Step by step</h3>
+            <ol class="steps-list" id="live-steps"></ol>
+            <div class="fare-calc" id="live-fare"></div>
+          </div>
+        </div>
+
+        <div class="panel">
+          <h3>Where these numbers come from</h3>
+          <ul class="bullets small" id="live-notes"></ul>
+        </div>
+      </div>
+    </section>
+
+    <!-- ===================== Results ===================== -->
+    <section class="wrap demo-only" id="results-area">
+      <div class="empty" id="empty-state">
+        <div class="empty-icon" aria-hidden="true">🧭</div>
+        <h2>Where are you going today?</h2>
+        <p>Choose a starting point and a destination, then press <b>Find Routes</b>.
+          The app runs Dijkstra's algorithm once per transport mode and ranks the results by fare.</p>
+      </div>
+
+      <div id="results" hidden>
+        <div class="results-head">
+          <h2 id="results-title"></h2>
+          <span class="muted" id="results-sub"></span>
+        </div>
+
+        <div class="summary" id="summary"></div>
+
+        <div class="stats" id="stats"></div>
+
+        <h3 class="section-title">Options ranked by fare <small>Select a card to see it on the map</small></h3>
+        <div class="cards" id="cards"></div>
+
+        <div class="split">
+          <div class="panel map-panel">
+            <div class="panel-head">
+              <h3 id="map-title">Route map</h3>
+              <div class="legend">
+                <span><i class="lg-road"></i>Road</span>
+                <span><i class="lg-metro"></i>Metro-only</span>
+                <span><i class="lg-route"></i>Selected route</span>
+              </div>
+            </div>
+            <svg id="map" role="img" aria-label="City network map with the selected route highlighted"></svg>
+          </div>
+          <div class="panel details-panel">
+            <h3 id="details-title">Leg-by-leg</h3>
+            <div class="table-scroll">
+              <table class="table" id="legs-table">
+                <thead><tr><th>#</th><th>From</th><th>To</th><th class="num">km</th><th class="num">min</th></tr></thead>
+                <tbody></tbody>
+              </table>
+            </div>
+            <div class="fare-calc" id="fare-calc"></div>
+          </div>
+        </div>
+
+        <div class="panel">
+          <h3>Comparison table</h3>
+          <div class="table-scroll">
+            <table class="table" id="compare-table">
+              <thead><tr><th>Rank</th><th>Mode</th><th class="num">Fare</th><th class="num">Distance</th><th class="num">Time</th><th>Route</th></tr></thead>
+              <tbody></tbody>
+            </table>
+          </div>
+          <p class="muted small">Journey time is the sum of connection times. Waiting, walking, transfers and traffic are not included.</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- ===================== History (SQLite) ===================== -->
+    <section class="wrap demo-only" id="history">
+      <div class="panel">
+        <div class="panel-head">
+          <h3>Search history <small class="muted">stored in SQLite by the backend</small></h3>
+          <button type="button" class="btn-ghost" id="clear-history">Clear history</button>
+        </div>
+        <div class="history-grid">
+          <div>
+            <h4>Recent searches</h4>
+            <ul class="history-list" id="recent-list"></ul>
+          </div>
+          <div>
+            <h4>Most searched</h4>
+            <ul class="history-list" id="popular-list"></ul>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ===================== How it works ===================== -->
+    <section class="wrap" id="learn">
+      <h2 class="section-h2">How it works</h2>
+      <div class="tabs" role="tablist">
+        <button role="tab" class="tab active" data-tab="algo" aria-selected="true">Algorithm</button>
+        <button role="tab" class="tab" data-tab="arch" aria-selected="false">Architecture</button>
+        <button role="tab" class="tab" data-tab="ds" aria-selected="false">Data structures</button>
+        <button role="tab" class="tab" data-tab="fares" aria-selected="false">Fare rules</button>
+        <button role="tab" class="tab" data-tab="limits" aria-selected="false">Assumptions</button>
+        <button role="tab" class="tab" data-tab="network" aria-selected="false">Network data</button>
+        <button role="tab" class="tab" data-tab="livedata" aria-selected="false">Live data</button>
+      </div>
+
+      <div class="tab-panel panel" data-panel="algo">
+        <h3>Dijkstra's algorithm, run once per transport mode</h3>
+        <ol class="steps">
+          <li>Set the source's distance to <code>0</code> and every other location's distance to <code>∞</code>.</li>
+          <li>Push <code>(0, source)</code> into a <b>min-heap</b> (priority queue).</li>
+          <li>Pop the location with the <b>smallest tentative distance</b>. Skip <i>stale</i> entries (already finalised or larger than the best known distance).</li>
+          <li><b>Relax</b> each edge of the current mode only: if <code>dist[u] + km &lt; dist[v]</code>, update <code>dist[v]</code>, store <code>parent[v] = (u, edge)</code> and push the new entry.</li>
+          <li>Stop when the destination is popped. Its distance is now final.</li>
+          <li><b>Rebuild the path</b> by following <code>parent</code> back from the destination, then reverse it.</li>
+        </ol>
+        <div class="callouts">
+          <div class="callout"><b>Why it is correct</b><p>Edge weights are never negative, so when a location is popped with the smallest distance, no other path can reach it more cheaply later.</p></div>
+          <div class="callout"><b>Why not BFS?</b><p>BFS minimises the <i>number of legs</i>, not total kilometres. A direct 5 km road would beat a 1 km + 1 km route, which is wrong.</p></div>
+          <div class="callout"><b>Complexity</b><p><code>O((V + E) log V)</code> time per run with a binary heap and <code>O(V + E)</code> space. It runs 4 times per search (once per mode).</p></div>
+        </div>
+      </div>
+
+      <div class="tab-panel panel" data-panel="arch" hidden>
+        <h3>Frontend → Backend → Algorithm → Database</h3>
+        <div class="arch">
+          <div class="arch-box"><b>Frontend</b><span>HTML · CSS · JavaScript</span><small>web/</small></div>
+          <div class="arch-arrow">HTTP / JSON →</div>
+          <div class="arch-box"><b>REST API</b><span>FastAPI</span><small>src/server.py</small></div>
+          <div class="arch-arrow">calls →</div>
+          <div class="arch-box accent"><b>Routing engine</b><span>Dijkstra + heapq</span><small>src/routing.py</small></div>
+          <div class="arch-arrow">saves →</div>
+          <div class="arch-box"><b>Database</b><span>SQLite</span><small>src/history.py</small></div>
+        </div>
+        <table class="table compact">
+          <thead><tr><th>Endpoint</th><th>Purpose</th></tr></thead>
+          <tbody>
+            <tr><td><code>GET /api/locations</code></td><td>Graph vertices with map coordinates</td></tr>
+            <tr><td><code>GET /api/network</code></td><td>All connections (edges)</td></tr>
+            <tr><td><code>GET /api/fares</code></td><td>Fare rules per mode</td></tr>
+            <tr><td><code>GET /api/routes?source=…&amp;destination=…</code></td><td>Cheapest route per mode, ranked by fare</td></tr>
+            <tr><td><code>GET /api/history</code> · <code>DELETE /api/history</code></td><td>Recent / popular searches (SQLite)</td></tr>
+          </tbody>
+        </table>
+        <p class="muted small">Interactive API documentation is generated automatically at <a href="/docs" target="_blank" rel="noopener">/docs</a>.</p>
+      </div>
+
+      <div class="tab-panel panel" data-panel="ds" hidden>
+        <table class="table compact">
+          <thead><tr><th>Data structure</th><th>Where it is used</th></tr></thead>
+          <tbody>
+            <tr><td><b>Graph (adjacency list)</b> <code>dict[location] → list[Edge]</code></td><td>Stores locations and their outgoing connections</td></tr>
+            <tr><td><b>Edge</b> <code>to, mode, distance_km, time_min</code></td><td>One connection for one transport mode</td></tr>
+            <tr><td><b>Min-heap</b> (<code>heapq</code>)</td><td>Always picks the closest unfinished location</td></tr>
+            <tr><td><b>Dictionary</b> <code>dist</code></td><td>Best known distance to each location</td></tr>
+            <tr><td><b>Dictionary</b> <code>parent</code></td><td>How each location was reached, used to rebuild the path</td></tr>
+            <tr><td><b>Set</b> <code>visited</code></td><td>Locations whose distance is final</td></tr>
+            <tr><td><b>List + reverse</b></td><td>Route from destination back to source</td></tr>
+            <tr><td><b>Sorting</b> by <code>(fare, time, mode)</code></td><td>Ranking the journey options</td></tr>
+            <tr><td><b>SQLite table</b> <code>searches</code></td><td>Persistent search history</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div class="tab-panel panel" data-panel="fares" hidden>
+        <h3>Illustrative sample fares, not official fares</h3>
+        <table class="table compact" id="fares-table">
+          <thead><tr><th>Mode</th><th class="num">Base fare</th><th class="num">Per km</th><th class="num">Example: 10 km</th></tr></thead>
+          <tbody></tbody>
+        </table>
+        <p><b>Total fare = base fare + per-km rate × total route distance.</b> The base fare is charged
+          <b>once per journey</b>, not once per road segment. The per-km rate is constant within a mode,
+          so the <b>shortest route is also the cheapest</b>. That is why Dijkstra minimises distance.</p>
+      </div>
+
+      <div class="tab-panel panel" data-panel="limits" hidden>
+        <ul class="bullets">
+          <li>The city map, distances, times and fares are <b>sample data</b>, not live or official values.</li>
+          <li>Journey time = sum of connection times. <b>Waiting, walking, transfers and traffic are not modelled.</b></li>
+          <li>Each journey uses <b>one transport mode</b> from start to finish (no bus → metro changes).</li>
+          <li>Connections are <b>bidirectional</b> with the same distance and time both ways.</li>
+          <li>The recommendation is the lowest fare. The fastest option is highlighted separately.</li>
+        </ul>
+      </div>
+
+      <div class="tab-panel panel" data-panel="network" hidden>
+        <div class="panel-head">
+          <h3>Transport connections <small class="muted" id="network-count"></small></h3>
+          <select id="network-filter" aria-label="Filter connections by mode">
+            <option value="">All modes</option>
+          </select>
+        </div>
+        <div class="table-scroll tall">
+          <table class="table compact" id="network-table">
+            <thead><tr><th>From</th><th>To</th><th>Mode</th><th class="num">km</th><th class="num">min</th></tr></thead>
+            <tbody></tbody>
+          </table>
+        </div>
+      </div>
+      <div class="tab-panel panel" data-panel="livedata" hidden>
+        <h3>What is live, what is official, what is estimated</h3>
+        <table class="table compact">
+          <thead><tr><th>Data</th><th>Source</th><th>Status</th></tr></thead>
+          <tbody>
+            <tr><td>Place search, road distance, drive time with traffic</td><td>Ola Maps API (called by our backend)</td><td><span class="kind kind-official">Live</span></td></tr>
+            <tr><td>Namma Metro stations, lines, timetable</td><td>BMRCL via Namma Metro GTFS (github.com/Vonter/bmrcl-gtfs, ODbL)</td><td><span class="kind kind-official">Real data</span></td></tr>
+            <tr><td>Metro route</td><td><b>Our Dijkstra</b> on the real network (states = station + line, so line changes cost time)</td><td><span class="kind kind-official">Computed</span></td></tr>
+            <tr><td>Metro fare</td><td>Official BMRCL station-to-station fare table (token/QR, smart card peak/off-peak)</td><td><span class="kind kind-official">Official fare</span></td></tr>
+            <tr><td>Auto fare</td><td>Govt. of Karnataka meter rate (Aug 2025): ₹36 for 2 km + ₹18/km, +50% at night</td><td><span class="kind kind-regulated">Govt rate</span></td></tr>
+            <tr><td>Cab fare (Uber / Ola)</td><td>Govt. of Karnataka uniform taxi fare (Feb 2025): ₹100 for 4 km + ₹24/km</td><td><span class="kind kind-regulated">Govt rate</span></td></tr>
+            <tr><td>Bike taxi fare</td><td>No official rate card; editable assumption</td><td><span class="kind kind-indicative">Indicative</span></td></tr>
+            <tr><td>BMTC bus fare and time</td><td>₹6 / ₹12 / ₹18 up to 6 km (Jan 2025). Longer trips estimated as the 2020 slabs × 1.2: ≈₹24 up to 14 km, ≈₹30 up to 40 km, ≈₹36 beyond. Time = road time × 1.5 + 8 min wait</td><td><span class="kind kind-partial">Estimate</span></td></tr>
+          </tbody>
+        </table>
+        <p><b>Why not live Uber / Ola / Rapido / Namma Yatri prices?</b> These companies do not offer public price APIs to
+          other apps (Uber no longer issues the server tokens its price-estimate API needs; Ola, Rapido and Namma Yatri
+          have no public fare API). Scraping their apps would break their terms of service. Instead, each card has a
+          button that opens the service, where you see the exact current price.</p>
+      </div>
+    </section>
+  </main>
+
+  <footer class="footer">
+    <div class="wrap">
+      <b>Smart Travel Cost Finder</b> · College DSA project · Python, FastAPI, SQLite, HTML/CSS/JS.
+      All locations, distances, times and fares are illustrative sample data.
+    </div>
+  </footer>
+
+  <script src="common.js"></script>
+  <script src="app.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.js"></script>
+  <script src="live.js"></script>
+</body>
+</html>
