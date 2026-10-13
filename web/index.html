@@ -10,12 +10,11 @@
 <!-- Everything is served locally: the site works with no internet (except live data and map tiles). -->
 <link rel="stylesheet" href="vendor/fonts.css">
 <link rel="stylesheet" href="vendor/leaflet/leaflet.css">
-<link rel="stylesheet" href="scrollcraft.css">
 <link rel="stylesheet" href="styles.css">
 </head>
 <body data-mode="live">
 
-<span data-sc-progress></span>
+<span data-progress></span>
 <a class="skip" href="#plan-from">Skip to the trip planner</a>
 
 <!-- App chrome is the navigation: this page is the tool, not an advert for it. -->
@@ -106,16 +105,16 @@
   </section>
 
   <!-- 2 · PAUSE. Authored silence before the peak: the ground goes dark, one line. -->
-  <section class="hush" id="hush" data-sc-act="flow">
-    <div class="hush__panel" data-sc-reveal="up" data-sc-reveal-at="0 0.45">
+  <section class="hush" id="hush" data-act="flow">
+    <div class="hush__panel" data-reveal="up" data-reveal-at="0 0.45">
       <p class="hush__line">How did it choose the metro route?</p>
       <p class="hush__meta"><i class="ic" data-i="timeline"></i><code>dijkstra()</code> on the real Namma Metro timetable, replayed step by step</p>
     </div>
   </section>
 
   <!-- 3 · PROOF (the peak). Scroll is the playhead of a real algorithm run. -->
-  <section class="peak" id="dijkstra" data-sc-act="pin" data-sc-span="4.8" aria-labelledby="run-title">
-    <div data-sc-stage class="peak__stage">
+  <section class="peak" id="dijkstra" data-act="pin" data-span="4.8" aria-labelledby="run-title">
+    <div data-stage class="peak__stage">
       <svg class="metro" id="metro" role="img" aria-label="Namma Metro map with the search spreading from the start station"></svg>
 
       <aside class="run" id="run" aria-label="Algorithm run">
@@ -169,9 +168,9 @@
   </section>
 
   <!-- 4 · TRUST. Every fare rule, with its source, travelling sideways. -->
-  <section class="fares" id="fares" data-sc-act="pan" data-sc-span="4.2">
-    <div data-sc-stage class="fares__stage">
-      <div class="rail" data-sc-pan="0.05">
+  <section class="fares" id="fares" data-act="pan" data-span="4.2">
+    <div data-stage class="fares__stage">
+      <div class="rail" data-pan="0.05">
         <div class="rail__lead">
           <h2 class="rail__title">Every fare shows where it comes from.</h2>
           <p class="rail__body">Uber, Ola, Rapido and Namma Yatri do not share live prices with other apps, so each number is labelled honestly and each result links to the real app.</p>
@@ -190,17 +189,17 @@
   </section>
 
   <!-- 5 · CONFIDENCE. Telemetry read from the running backend, not typed in. -->
-  <section class="system" id="system" data-sc-act="flow" aria-labelledby="sys-title">
-    <div class="system__wrap" data-sc-in data-sc-stagger="60">
+  <section class="system" id="system" data-act="flow" aria-labelledby="sys-title">
+    <div class="system__wrap" data-in data-stagger="60">
       <h2 class="system__title" id="sys-title"><i class="ic" data-i="monitoring"></i>System status</h2>
       <p class="system__lede">Read from the running backend.</p>
       <dl class="tele">
-        <div class="tele__cell tele__cell--wide"><dt>Metro stations in the graph</dt><dd><span id="tc-stations" class="sc-nums" data-count>0</span></dd></div>
-        <div class="tele__cell"><dt>Metro lines</dt><dd><span id="tc-lines" class="sc-nums" data-count>0</span></dd></div>
-        <div class="tele__cell"><dt>Graph states</dt><dd><span id="tc-states" class="sc-nums" data-count>0</span></dd></div>
-        <div class="tele__cell"><dt>Demo locations</dt><dd><span id="tc-demo" class="sc-nums" data-count>0</span></dd></div>
-        <div class="tele__cell"><dt>Demo connections</dt><dd><span id="tc-conn" class="sc-nums" data-count>0</span></dd></div>
-        <div class="tele__cell"><dt>Map calls today</dt><dd><span id="tc-calls" class="sc-nums">n/a</span></dd></div>
+        <div class="tele__cell tele__cell--wide"><dt>Metro stations in the graph</dt><dd><span id="tc-stations" class="nums" data-count>0</span></dd></div>
+        <div class="tele__cell"><dt>Metro lines</dt><dd><span id="tc-lines" class="nums" data-count>0</span></dd></div>
+        <div class="tele__cell"><dt>Graph states</dt><dd><span id="tc-states" class="nums" data-count>0</span></dd></div>
+        <div class="tele__cell"><dt>Demo locations</dt><dd><span id="tc-demo" class="nums" data-count>0</span></dd></div>
+        <div class="tele__cell"><dt>Demo connections</dt><dd><span id="tc-conn" class="nums" data-count>0</span></dd></div>
+        <div class="tele__cell"><dt>Map calls today</dt><dd><span id="tc-calls" class="nums">n/a</span></dd></div>
         <div class="tele__cell"><dt>Last comparison took</dt><dd><span id="tc-ms">n/a</span></dd></div>
         <div class="tele__cell"><dt>Metro timetable valid for</dt><dd><span id="tc-feed">n/a</span></dd></div>
         <div class="tele__cell"><dt>Road data</dt><dd id="tc-maps">checking</dd></div>
@@ -210,8 +209,8 @@
   </section>
 
   <!-- 6 · AGAIN. The page ends on an actual input, not a button. -->
-  <section class="again" id="again" data-sc-act="pin" data-sc-span="1.2">
-    <div data-sc-stage class="again__stage">
+  <section class="again" id="again" data-act="pin" data-span="1.2">
+    <div data-stage class="again__stage">
       <div class="again__inner">
         <label class="again__q" for="again-input">Where to next?</label>
         <div class="again__field field">
@@ -234,7 +233,7 @@
 <div class="snack" id="snack" role="status" aria-live="polite"></div>
 
 <script src="vendor/leaflet/leaflet.js"></script>
-<script src="scrollcraft.js"></script>
+<script src="motion.js"></script>
 <script src="app.js"></script>
 </body>
 </html>

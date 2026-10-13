@@ -187,7 +187,7 @@ browser's location.
 
 ```
 smart-travel-cost-finder/
-├── web/                     # Frontend: index.html, styles.css, app.js, scrollcraft.js/.css (scroll engine)
+├── web/                     # Frontend: index.html, styles.css, app.js, motion.js (our scroll engine), vendor/
 ├── src/
 │   ├── graph.py             # demo city graph (adjacency list)
 │   ├── fares.py             # demo fare rules
