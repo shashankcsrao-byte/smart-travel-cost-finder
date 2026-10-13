@@ -297,3 +297,46 @@ combination is kept, with time as the tie-break.
 35. **Why does the run explore stations in the wrong direction?** Dijkstra has no sense of
     direction. It settles stations in order of time from the start, so nearby stations in every
     direction come first. (A* would use a distance estimate to aim at the goal.)
+
+
+## 14. Version 2 algorithms (after the audit)
+
+**Time-dependent Dijkstra (metro timetable).** A state is (station, line) at a time t.
+The next train in each direction is found by **binary search** (`bisect`) over that
+station's sorted departure times: O(log n). The cost of an edge depends on *when* you
+arrive, because you may have to wait. Dijkstra is still correct because the network is
+**FIFO**: arriving earlier never makes you arrive later. Trains after midnight are stored
+as times like 24:20 in the previous day's service, so the search checks today's services
+plus yesterday's shifted back by 24 h.
+
+**A\*.** Priority = cost so far + h(node). With h = straight-line distance ÷ the fastest
+speed of any train, h never overestimates, so A\* is optimal. It settles fewer states, for
+example 56 instead of 75 for Whitefield → Silk Institute.
+
+**Yen's k-shortest paths.** To find the next best route, take each node of the previous
+route as a "spur", keep the part before it, ban the edges earlier routes used next, and run
+Dijkstra for the rest. The cheapest candidate becomes route k+1. The test compares the
+results with brute force.
+
+**Mixed-mode Dijkstra.** A state is (location, current mode). Boarding a new mode costs
+its base fare (plus 5 min if it is a change). Riding costs per-km × km. The cost minimised
+is fare + λ × minutes, where λ comes from the priority (₹0 / ₹2 / ₹50 per minute). The
+costs are non-negative, so Dijkstra applies.
+
+**Ties.** Costs are pairs, (distance, time) or (time, distance), so ties are broken by the
+second measure. Python tuples compare element by element, so the heap code did not change.
+
+**Sliding-window rate limiter.** Each IP has a deque of request times. Old times are
+dropped from the left, and a request is allowed if fewer than the limit remain. This is
+O(1) amortised.
+
+### Viva questions (v2)
+36. **Why is time-dependent Dijkstra correct?** It is correct because of the FIFO
+    property, and because waiting is never worse than leaving later.
+37. **What makes an A\* heuristic admissible?** It must never overestimate the remaining
+    cost. Ours uses top speed, so the real time is always at least the estimate.
+38. **Why is "Fastest" now the car's ring-road route?** Each mode now also gets its
+    quickest route, not only its cheapest. The badge goes to the single quickest journey.
+39. **What is the trade-off between the Cheapest and Balanced priorities?** Balanced
+    counts each minute as ₹2. Metro (₹91, 45 min) then beats Bus (₹57, 88 min), because
+    91 + 90 < 57 + 176.

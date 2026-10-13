@@ -4,14 +4,12 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Smart Travel · cheapest way there</title>
-<meta name="description" content="Compare bus, metro, auto, bike taxi and cab across Bengaluru, ranked by fare, with the route found by a hand-written Dijkstra's algorithm.">
+<meta name="description" content="Compare walk, bus, metro, auto, bike taxi and cab across Bengaluru, ranked by your priority, with routes found by hand-written Dijkstra, A* and a real metro timetable search.">
 <meta name="theme-color" content="#F7F7FA">
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' rx='9' fill='%2316181D'/><circle cx='10' cy='22' r='3.4' fill='%23fff'/><circle cx='22' cy='10' r='3.4' fill='%23AAB6FF'/><path d='M10 22 C10 14 22 18 22 10' stroke='%23fff' stroke-width='2.4' fill='none' stroke-linecap='round'/></svg>">
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600&family=Outfit:wght@500;600;700;800&display=swap">
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Material+Symbols+Rounded:opsz,wght,FILL,GRAD@20..48,300..600,0..1,0&icon_names=arrow_forward,bolt,check_circle,close,directions_bus,directions_walk,electric_rickshaw,expand_more,info,local_taxi,location_on,monitoring,my_location,near_me,open_in_new,payments,receipt_long,refresh,route,savings,schedule,search,subway,swap_horiz,swap_vert,timeline,trip_origin,two_wheeler,verified,warning,wifi_off&display=block">
-<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.css">
+<!-- Everything is served locally: the site works with no internet (except live data and map tiles). -->
+<link rel="stylesheet" href="vendor/fonts.css">
+<link rel="stylesheet" href="vendor/leaflet/leaflet.css">
 <link rel="stylesheet" href="scrollcraft.css">
 <link rel="stylesheet" href="styles.css">
 </head>
@@ -27,14 +25,14 @@
     <span class="brand__word">Smart Travel</span>
   </a>
   <nav class="tabs" aria-label="Sections">
-    <a href="#top" class="tab is-on" data-tab="top"><span class="ms" aria-hidden="true">route</span>Plan</a>
-    <a href="#dijkstra" class="tab" data-tab="dijkstra"><span class="ms" aria-hidden="true">timeline</span>Dijkstra</a>
-    <a href="#fares" class="tab" data-tab="fares"><span class="ms" aria-hidden="true">payments</span>Fares</a>
-    <a href="#system" class="tab" data-tab="system"><span class="ms" aria-hidden="true">monitoring</span>System</a>
+    <a href="#top" class="tab is-on" data-tab="top"><i class="ic" data-i="route"></i>Plan</a>
+    <a href="#dijkstra" class="tab" data-tab="dijkstra" id="tab-dijkstra"><i class="ic" data-i="timeline"></i>Dijkstra</a>
+    <a href="#fares" class="tab" data-tab="fares"><i class="ic" data-i="payments"></i>Fares</a>
+    <a href="#system" class="tab" data-tab="system"><i class="ic" data-i="monitoring"></i>System</a>
   </nav>
   <div class="seg" role="radiogroup" aria-label="Data source">
-    <button type="button" class="seg__btn" role="radio" aria-checked="true" data-mode="live"><span class="dot" aria-hidden="true"></span>Live</button>
-    <button type="button" class="seg__btn" role="radio" aria-checked="false" data-mode="demo">Demo</button>
+    <button type="button" class="seg__btn" role="radio" aria-checked="true" data-mode="live" tabindex="0"><span class="dot" aria-hidden="true"></span>Live</button>
+    <button type="button" class="seg__btn" role="radio" aria-checked="false" data-mode="demo" tabindex="-1">Demo</button>
   </div>
 </header>
 
@@ -45,43 +43,63 @@
     <div class="hero__grid">
       <div class="hero__left">
         <h1 class="hero__title" id="hero-title">The cheapest way there, <span class="hero__accent">already ranked.</span></h1>
-        <p class="hero__sub" id="hero-sub">Bus, metro, auto, bike taxi and cab on live Bengaluru roads.</p>
+        <p class="hero__sub" id="hero-sub">Walk, bus, metro, auto, bike taxi and cab on live Bengaluru roads.</p>
 
         <form class="planner" id="planner" autocomplete="off" novalidate>
           <div class="field" data-end="from">
-            <span class="ms field__icon" aria-hidden="true">trip_origin</span>
+            <i class="ic field__icon" data-i="trip_origin"></i>
             <label class="field__label" for="plan-from">From</label>
             <input class="field__input" id="plan-from" type="text" placeholder="Start typing a place" role="combobox"
                    aria-autocomplete="list" aria-expanded="false" aria-controls="plan-from-list" spellcheck="false">
-            <button type="button" class="icon-btn field__act" id="locate" aria-label="Use my location" title="Use my location"><span class="ms" aria-hidden="true">my_location</span></button>
-            <ul class="menu" id="plan-from-list" role="listbox" hidden></ul>
+            <button type="button" class="icon-btn field__act" id="locate" aria-label="Use my location" title="Use my location"><i class="ic" data-i="my_location"></i></button>
+            <ul class="menu" id="plan-from-list" role="listbox" aria-label="Start suggestions" hidden></ul>
           </div>
-          <button type="button" class="swap" id="swap" aria-label="Swap start and destination" title="Swap"><span class="ms" aria-hidden="true">swap_vert</span></button>
+          <button type="button" class="swap" id="swap" aria-label="Swap start and destination" title="Swap"><i class="ic" data-i="swap_vert"></i></button>
           <div class="field" data-end="to">
-            <span class="ms field__icon field__icon--to" aria-hidden="true">location_on</span>
+            <i class="ic field__icon field__icon--to" data-i="location_on" data-fill></i>
             <label class="field__label" for="plan-to">To</label>
             <input class="field__input" id="plan-to" type="text" placeholder="Where are you going?" role="combobox"
                    aria-autocomplete="list" aria-expanded="false" aria-controls="plan-to-list" spellcheck="false">
-            <ul class="menu" id="plan-to-list" role="listbox" hidden></ul>
+            <ul class="menu" id="plan-to-list" role="listbox" aria-label="Destination suggestions" hidden></ul>
           </div>
         </form>
 
+        <div class="controls">
+          <div class="pri" role="radiogroup" aria-label="Priority">
+            <button type="button" class="pri__btn" role="radio" aria-checked="true" data-p="cheapest" tabindex="0"><i class="ic" data-i="savings"></i>Cheapest</button>
+            <button type="button" class="pri__btn" role="radio" aria-checked="false" data-p="balanced" tabindex="-1"><i class="ic" data-i="alt_route"></i>Balanced</button>
+            <button type="button" class="pri__btn" role="radio" aria-checked="false" data-p="fastest" tabindex="-1"><i class="ic" data-i="bolt"></i>Fastest</button>
+          </div>
+          <label class="when" for="leave-at"><i class="ic" data-i="schedule"></i><span>Leave</span>
+            <input type="time" id="leave-at" aria-label="Leave at (leave empty for now)">
+            <button type="button" class="when__now" id="leave-now" title="Leave now">Now</button>
+          </label>
+        </div>
+
         <div class="chips" id="quick" aria-label="Quick trips"></div>
 
-        <div class="results" id="results" aria-live="polite" aria-busy="true">
+        <div class="results" id="results">
           <div class="results__head">
-            <p class="results__title" id="results-title">Comparing…</p>
-            <p class="results__meta" id="results-meta"></p>
+            <div>
+              <p class="results__title" id="results-title">Comparing…</p>
+              <p class="results__meta" id="results-meta"></p>
+            </div>
+            <div class="results__acts">
+              <button type="button" class="icon-btn" id="save-trip" aria-pressed="false" aria-label="Save this trip" title="Save this trip"><i class="ic" data-i="star"></i></button>
+              <button type="button" class="icon-btn" id="share-trip" aria-label="Share this trip" title="Share this trip"><i class="ic" data-i="share"></i></button>
+            </div>
           </div>
-          <ol class="opts" id="opts"></ol>
+          <p class="sr" id="results-live" aria-live="polite"></p>
+          <ol class="opts" id="opts" aria-busy="true"></ol>
         </div>
       </div>
 
       <div class="hero__right">
         <figure class="mapcard">
-          <div class="mapcard__map" id="hero-map" role="img" aria-label="Map of the selected route"></div>
-          <figcaption class="mapcard__cap" id="map-cap"><span class="ms" aria-hidden="true">near_me</span><span>Pick a trip to see its route</span></figcaption>
+          <div class="mapcard__map" id="hero-map" role="region" aria-label="Map of the selected route"></div>
+          <figcaption class="mapcard__cap" id="map-cap"><i class="ic" data-i="near_me" data-fill></i><span>Pick a trip to see its route</span></figcaption>
           <div class="savings" id="savings" hidden></div>
+          <p class="maphint" id="map-hint" hidden><i class="ic" data-i="pin_drop"></i>Tap the map to set a start or destination</p>
         </figure>
       </div>
     </div>
@@ -91,33 +109,39 @@
   <section class="hush" id="hush" data-sc-act="flow">
     <div class="hush__panel" data-sc-reveal="up" data-sc-reveal-at="0 0.45">
       <p class="hush__line">How did it choose the metro route?</p>
-      <p class="hush__meta"><span class="ms" aria-hidden="true">timeline</span><code>dijkstra()</code> on the real Namma Metro graph, replayed step by step</p>
+      <p class="hush__meta"><i class="ic" data-i="timeline"></i><code>dijkstra()</code> on the real Namma Metro timetable, replayed step by step</p>
     </div>
   </section>
 
   <!-- 3 · PROOF (the peak). Scroll is the playhead of a real algorithm run. -->
   <section class="peak" id="dijkstra" data-sc-act="pin" data-sc-span="4.8" aria-labelledby="run-title">
     <div data-sc-stage class="peak__stage">
-      <svg class="metro" id="metro" role="img" aria-labelledby="run-title run-status"></svg>
+      <svg class="metro" id="metro" role="img" aria-label="Namma Metro map with the search spreading from the start station"></svg>
 
-      <aside class="run" aria-label="Algorithm run">
+      <aside class="run" id="run" aria-label="Algorithm run">
         <div class="run__head">
-          <h2 class="run__title" id="run-title">Dijkstra · live run</h2>
+          <div class="run__titlebar">
+            <h2 class="run__title" id="run-title">Live run</h2>
+            <div class="algo" role="radiogroup" aria-label="Algorithm">
+              <button type="button" class="algo__btn" role="radio" aria-checked="true" data-a="dijkstra" tabindex="0">Dijkstra</button>
+              <button type="button" class="algo__btn" role="radio" aria-checked="false" data-a="astar" tabindex="-1">A*</button>
+            </div>
+          </div>
           <div class="run__ends">
             <label><span class="sr">From station</span><select id="run-from"></select></label>
-            <span class="ms run__arrow" aria-hidden="true">arrow_forward</span>
+            <i class="ic run__arrow" data-i="arrow_forward"></i>
             <label><span class="sr">To station</span><select id="run-to"></select></label>
           </div>
-          <p class="run__tip"><span class="ms" aria-hidden="true">info</span>Tap any station on the map to make it the destination.</p>
+          <p class="run__tip" id="run-tip"><i class="ic" data-i="info"></i><span>Tap a station on the map to make it the destination.</span></p>
         </div>
 
         <dl class="run__stats">
           <div><dt>Heap pops</dt><dd id="st-pops">0</dd></div>
-          <div><dt>Stations settled</dt><dd id="st-settled">0</dd></div>
-          <div><dt>Best time so far</dt><dd id="st-time">0 min</dd></div>
+          <div><dt>Settled</dt><dd id="st-settled">0</dd></div>
+          <div><dt>Time so far</dt><dd id="st-time">0 min</dd></div>
         </dl>
 
-        <div class="run__now" id="run-status">Waiting at the start station</div>
+        <div class="run__now" id="run-status" aria-live="polite">Waiting at the start station</div>
 
         <div class="run__heap">
           <p class="run__sub">Min-heap, smallest first</p>
@@ -132,8 +156,13 @@
       </aside>
 
       <div class="scrubber">
+        <div class="player" role="group" aria-label="Replay controls">
+          <button type="button" class="icon-btn" id="step-back" aria-label="Previous step"><i class="ic" data-i="skip_previous"></i></button>
+          <button type="button" class="icon-btn player__play" id="play" aria-label="Play the run"><i class="ic" data-i="play_arrow" data-fill></i></button>
+          <button type="button" class="icon-btn" id="step-next" aria-label="Next step"><i class="ic" data-i="skip_next"></i></button>
+        </div>
         <label for="trace-range" class="sr">Algorithm step</label>
-        <input type="range" id="trace-range" min="0" max="1000" value="0">
+        <input type="range" id="trace-range" min="0" max="1000" step="1" value="0">
         <span class="scrubber__out" id="trace-out">step 0</span>
       </div>
     </div>
@@ -147,13 +176,13 @@
           <h2 class="rail__title">Every fare shows where it comes from.</h2>
           <p class="rail__body">Uber, Ola, Rapido and Namma Yatri do not share live prices with other apps, so each number is labelled honestly and each result links to the real app.</p>
         </div>
-        <article class="rate" data-mode="metro"><span class="ms rate__icon" aria-hidden="true">subway</span><h3>Metro</h3><p class="rate__kind"></p><p class="rate__rule"></p><p class="rate__ex"></p><p class="rate__src"></p></article>
-        <article class="rate" data-mode="bus"><span class="ms rate__icon" aria-hidden="true">directions_bus</span><h3>Bus</h3><p class="rate__kind"></p><p class="rate__rule"></p><p class="rate__ex"></p><p class="rate__src"></p></article>
-        <article class="rate" data-mode="auto"><span class="ms rate__icon" aria-hidden="true">electric_rickshaw</span><h3>Auto</h3><p class="rate__kind"></p><p class="rate__rule"></p><p class="rate__ex"></p><p class="rate__src"></p></article>
-        <article class="rate" data-mode="bike_taxi"><span class="ms rate__icon" aria-hidden="true">two_wheeler</span><h3>Bike</h3><p class="rate__kind"></p><p class="rate__rule"></p><p class="rate__ex"></p><p class="rate__src"></p></article>
-        <article class="rate" data-mode="cab"><span class="ms rate__icon" aria-hidden="true">local_taxi</span><h3>Cab</h3><p class="rate__kind"></p><p class="rate__rule"></p><p class="rate__ex"></p><p class="rate__src"></p></article>
+        <article class="rate" data-mode="metro"><i class="ic rate__icon" data-i="subway"></i><h3>Metro</h3><p class="rate__kind"></p><p class="rate__rule"></p><p class="rate__ex"></p><p class="rate__src"></p></article>
+        <article class="rate" data-mode="bus"><i class="ic rate__icon" data-i="directions_bus"></i><h3>Bus</h3><p class="rate__kind"></p><p class="rate__rule"></p><p class="rate__ex"></p><p class="rate__src"></p></article>
+        <article class="rate" data-mode="auto"><i class="ic rate__icon" data-i="electric_rickshaw"></i><h3>Auto</h3><p class="rate__kind"></p><p class="rate__rule"></p><p class="rate__ex"></p><p class="rate__src"></p></article>
+        <article class="rate" data-mode="bike_taxi"><i class="ic rate__icon" data-i="two_wheeler"></i><h3>Bike</h3><p class="rate__kind"></p><p class="rate__rule"></p><p class="rate__ex"></p><p class="rate__src"></p></article>
+        <article class="rate" data-mode="cab"><i class="ic rate__icon" data-i="local_taxi"></i><h3>Cab</h3><p class="rate__kind"></p><p class="rate__rule"></p><p class="rate__ex"></p><p class="rate__src"></p></article>
         <div class="rail__note">
-          <span class="ms" aria-hidden="true">open_in_new</span>
+          <i class="ic" data-i="open_in_new"></i>
           <p>For the exact price right now, open a result above and tap the app button.</p>
         </div>
       </div>
@@ -163,17 +192,20 @@
   <!-- 5 · CONFIDENCE. Telemetry read from the running backend, not typed in. -->
   <section class="system" id="system" data-sc-act="flow" aria-labelledby="sys-title">
     <div class="system__wrap" data-sc-in data-sc-stagger="60">
-      <h2 class="system__title" id="sys-title"><span class="ms" aria-hidden="true">monitoring</span>System status</h2>
-      <p class="system__lede">Read from the running backend when this page loaded.</p>
+      <h2 class="system__title" id="sys-title"><i class="ic" data-i="monitoring"></i>System status</h2>
+      <p class="system__lede">Read from the running backend.</p>
       <dl class="tele">
-        <div class="tele__cell tele__cell--wide"><dt>Metro stations in the graph</dt><dd><span id="tc-stations" class="sc-nums">0</span></dd></div>
-        <div class="tele__cell"><dt>Metro lines</dt><dd><span id="tc-lines" class="sc-nums">0</span></dd></div>
-        <div class="tele__cell"><dt>Graph states</dt><dd><span id="tc-states" class="sc-nums">0</span></dd></div>
-        <div class="tele__cell"><dt>Demo locations</dt><dd><span id="tc-demo" class="sc-nums">0</span></dd></div>
-        <div class="tele__cell"><dt>Demo connections</dt><dd><span id="tc-conn" class="sc-nums">0</span></dd></div>
-        <div class="tele__cell tele__cell--wide"><dt>Last comparison took</dt><dd><span id="tc-ms">n/a</span></dd></div>
-        <div class="tele__cell tele__cell--wide"><dt>Road data</dt><dd id="tc-maps">checking</dd></div>
+        <div class="tele__cell tele__cell--wide"><dt>Metro stations in the graph</dt><dd><span id="tc-stations" class="sc-nums" data-count>0</span></dd></div>
+        <div class="tele__cell"><dt>Metro lines</dt><dd><span id="tc-lines" class="sc-nums" data-count>0</span></dd></div>
+        <div class="tele__cell"><dt>Graph states</dt><dd><span id="tc-states" class="sc-nums" data-count>0</span></dd></div>
+        <div class="tele__cell"><dt>Demo locations</dt><dd><span id="tc-demo" class="sc-nums" data-count>0</span></dd></div>
+        <div class="tele__cell"><dt>Demo connections</dt><dd><span id="tc-conn" class="sc-nums" data-count>0</span></dd></div>
+        <div class="tele__cell"><dt>Map calls today</dt><dd><span id="tc-calls" class="sc-nums">n/a</span></dd></div>
+        <div class="tele__cell"><dt>Last comparison took</dt><dd><span id="tc-ms">n/a</span></dd></div>
+        <div class="tele__cell"><dt>Metro timetable valid for</dt><dd><span id="tc-feed">n/a</span></dd></div>
+        <div class="tele__cell"><dt>Road data</dt><dd id="tc-maps">checking</dd></div>
       </dl>
+      <p class="system__warn" id="tc-warn" hidden></p>
     </div>
   </section>
 
@@ -183,16 +215,16 @@
       <div class="again__inner">
         <label class="again__q" for="again-input">Where to next?</label>
         <div class="again__field field">
-          <span class="ms field__icon field__icon--to" aria-hidden="true">search</span>
+          <i class="ic field__icon field__icon--to" data-i="search"></i>
           <input class="field__input" id="again-input" type="text" placeholder="Type a place" role="combobox"
                  aria-autocomplete="list" aria-expanded="false" aria-controls="again-list" spellcheck="false">
-          <ul class="menu menu--up" id="again-list" role="listbox" hidden></ul>
+          <ul class="menu menu--up" id="again-list" role="listbox" aria-label="Destination suggestions" hidden></ul>
         </div>
         <p class="again__hint">From <b id="again-from">your start</b>. Pick a place and the comparison runs at the top.</p>
       </div>
       <footer class="foot">
-        <p>Smart Travel Cost Finder · college DSA project · Python, FastAPI, SQLite, hand-written Dijkstra.</p>
-        <p>Road times: Ola Maps. Metro: BMRCL via Namma Metro GTFS (ODbL). Map tiles © OpenStreetMap contributors. Fares are official, Govt-notified, estimated or indicative, as labelled.</p>
+        <p>Smart Travel Cost Finder · college DSA project · Python, FastAPI, SQLite, hand-written Dijkstra, A* and Yen's algorithm.</p>
+        <p>Road times: Ola Maps. Metro: BMRCL via Namma Metro GTFS (ODbL). Map tiles © OpenStreetMap contributors. Icons: Material Symbols (Apache 2.0). Fonts: Outfit, Geist (OFL). Fares are official, Govt-notified, estimated or indicative, as labelled.</p>
       </footer>
     </div>
   </section>
@@ -201,7 +233,7 @@
 
 <div class="snack" id="snack" role="status" aria-live="polite"></div>
 
-<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.js"></script>
+<script src="vendor/leaflet/leaflet.js"></script>
 <script src="scrollcraft.js"></script>
 <script src="app.js"></script>
 </body>

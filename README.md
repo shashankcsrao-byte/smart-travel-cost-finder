@@ -84,14 +84,57 @@ FastAPI  src/server.py ─ validation, errors (404/422/502/503), JSON
 | `GET /api/live/status` | Is live mode configured? Is metro data loaded? Data sources |
 | `GET /api/live/places?q=` | Place suggestions (proxied to Ola Maps) |
 | `GET /api/live/place?place_id=` | Coordinates of a suggestion |
-| `GET /api/live/plan?from_lat&from_lng&from_name&to_lat&to_lng&to_name` | Ranked options for a real trip |
+| `GET /api/live/plan?from_lat&from_lng&from_name&to_lat&to_lng&to_name&priority=&at=` | Ranked options for a real trip (priority: cheapest, balanced, fastest; at: leave time HH:MM) |
 | `GET /api/live/metro` | Metro stations and lines (for the map) |
 | `GET /api/live/history` | Recent live trips |
-| `GET /api/live/metro/trace?from=…&to=…` | Every step of our Dijkstra on the metro graph (for the website replay) |
+| `GET /api/live/metro/trace?from=…&to=…&at=HH:MM&algorithm=dijkstra\|astar` | Every step of the timetable search (website replay) |
+| `GET /api/live/reverse?lat=…&lng=…` | Name of a point picked on the map |
+| `GET /api/routes/alternatives?source=…&destination=…&mode=…&k=3` | Yen's k-shortest routes for one mode (demo) |
 | `GET /api/live/fares` | Live-mode fare rules with their sources |
-| `GET /api/routes?source=…&destination=…` | Demo city: cheapest route per mode |
+| `GET /api/routes?source=…&destination=…&priority=…` | Demo city: every mode, quicker routes and a Smart mix, ranked by priority |
 | `GET /api/locations` · `/api/network` · `/api/fares` | Demo city data |
 | `GET /api/history` · `DELETE /api/history` | Search history |
+
+## Version 2 (after the full audit)
+
+**Algorithms (all hand-written, all tested):**
+- **Dijkstra** with a time tie-break: among equally short routes the quicker one wins.
+- **Time-dependent Dijkstra on the real metro timetable:** binary search finds the next train
+  from each station. It handles weekday, Monday, Sunday and holiday timetables, and trains
+  running after midnight. It answers "board 09:09, arrive 10:20".
+- **A\*** with an admissible straight-line ÷ top-speed heuristic: the same answer while
+  settling about 25% fewer states. The website lets you switch between Dijkstra and A\*.
+- **Yen's k-shortest paths:** "Other routes" for a mode (demo city).
+- **Mixed-mode Dijkstra** on (location, mode) states, paying a base fare per boarding:
+  "Smart mix: Bike Taxi → Metro".
+- **Priority:** Cheapest, Balanced or Fastest. It converts time to money (₹0 / ₹2 / ₹50 per
+  minute) for ranking and for the mixed-mode search.
+- **Exactly one Cheapest and one Fastest:** ties go to the cheaper option, then a fixed mode
+  order.
+
+**Reliability and security:**
+- The cache is thread-safe, and a sliding-window rate limiter protects the Ola quota.
+- Bad data from Ola Maps becomes a clean error instead of a crash; status codes are honest.
+- The API key never appears in logs.
+- Requests are accepted only from trusted hosts, and cross-site requests are refused.
+- Responses carry a Content-Security-Policy and other security headers.
+- Clearing history requires the header `X-Requested-With: smart-travel`.
+- Repeated searches are not stored twice, and history is capped at 500 rows.
+- Fonts, icons and the map library are bundled in `web/vendor/`, so the page works offline.
+  Rebuild them with `python tools/build_vendor.py`.
+
+**Website:**
+- **Priority switch** (Cheapest / Balanced / Fastest) and a **Leave at** time.
+- **Saved trips (★) and recent trips,** stored on this device only.
+- **Share link:** the trip is kept in the URL.
+- **Tap the map** to set a start or destination.
+- Metro lines are drawn on the live map, and short trips get a free Walk option.
+- **Replay controls:** play, pause, step, Dijkstra / A\*.
+- **Fixes:**
+  - The replay now stays in sync with scrolling on phones.
+  - Async race conditions are guarded.
+  - Mobile maps no longer trap one-finger scrolling.
+  - Keyboard and screen-reader access is improved.
 
 ## The website (redesign, Oct 2026)
 
@@ -154,6 +197,7 @@ smart-travel-cost-finder/
 │   ├── main.py              # terminal app
 │   ├── visualize.py         # Matplotlib map for Streamlit
 │   └── live/
+│       ├── ratelimit.py     # sliding-window rate limiter
 │       ├── settings.py      # .env loading, paths
 │       ├── olamaps.py       # Ola Maps client
 │       ├── cache.py         # TTL + LRU cache
@@ -161,7 +205,8 @@ smart-travel-cost-finder/
 │       ├── fares.py         # published Bengaluru fare rules
 │       └── planner.py       # builds and ranks live options
 ├── data/bmrcl-gtfs/         # Namma Metro GTFS (ODbL) + attribution
-├── tests/                   # 78 tests (no API key or internet needed)
+├── tests/                   # 119 tests (no API key or internet needed)
+├── tools/build_vendor.py    # copies fonts/icons/Leaflet into web/vendor (offline)
 ├── docs/VIVA_NOTES.md
 ├── app.py                   # Streamlit dashboard
 ├── .env.example             # copy to .env and add your key
@@ -170,7 +215,7 @@ smart-travel-cost-finder/
 
 ## Tests
 
-`python -m pytest -v` runs 78 tests offline. Ola Maps is replaced by a fake HTTP
+`python -m pytest -v` runs 119 tests offline. Ola Maps is replaced by a fake HTTP
 transport, and the metro tests use the real GTFS file. They cover Dijkstra (including a
 brute-force check), fares, the TTL cache, Ola Maps response parsing and errors, real metro
 routes and interchanges, official fare lookup, operating hours, the live planner, and every
