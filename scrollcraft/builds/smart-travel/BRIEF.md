@@ -142,3 +142,13 @@ Bugs found by verification and fixed: the map route was invisible (engine reset 
 rule squeezed Leaflet's SVG layer to 0 px); on phones the final result card overflowed its
 panel and the fare bubble covered a label; the heap snapshot was taken before neighbours were
 pushed; the closing input did not land on the new results.
+
+
+## v2 changes (audit, 2026-10-13)
+
+The peak now replays the **time-dependent** search on the real timetable at the chosen
+departure time, with a Dijkstra / A* switch and play, pause and step controls. The hero gained
+a priority switch, a "Leave at" time, save and share buttons, and tap-the-map. The grammar
+(live surface), curve and peak are unchanged. Re-verified: desktop, phone and reduced
+motion all report no dead scroll. Phone scroll sync was fixed by re-measuring the engine
+whenever the layout changes; it was 14% early before.

@@ -136,8 +136,13 @@ def plan_metro(maps, metro, origin, destination, depart, priority="cheapest"):
         if waits:
             station, at_station = waits[0]
             when = metro.next_departure(station["id"], at_station)
+            soon = when and (datetime.strptime(when, "%H:%M") - datetime.strptime(at_station.strftime("%H:%M"), "%H:%M")
+                             ).seconds / 60 <= F.MAX_TRAIN_WAIT_MIN
+            if soon:
+                # A train is coming, but the connections needed to finish the trip have stopped.
+                return None, "Too late to finish this trip by metro tonight (the last connection has gone)"
             return None, (f"No metro train soon from {station['name']}"
-                          + (f". Next train at {when}" if when else ". No more trains today"))
+                          + (f". First train at {when}" if when else ". No more trains today"))
         return None, "No useful metro route between these places"
 
     _score, total_fare, total_time, first_leg, journey, fare_info, last_leg = best
