@@ -61,6 +61,24 @@ pip install -r requirements.txt
 | Streamlit dashboard (demo data) | `streamlit run app.py` | http://localhost:8501 |
 | Tests | `python -m pytest -v` | |
 
+## Deploy (Render, free plan)
+
+The repo includes `render.yaml`, so Render can set the service up for you.
+
+1. Sign in at [render.com](https://render.com) with GitHub and allow it to see this repo.
+2. Choose **New → Blueprint**, then pick this repository.
+3. When asked for `OLA_MAPS_API_KEY`, paste your Ola Maps key. It stays in Render's settings
+   and is never in the code.
+4. Wait for the build (2 to 4 minutes). Your site is then at `https://<name>.onrender.com`.
+
+Notes:
+- Every `git push` to `main` redeploys automatically.
+- The free plan sleeps after about 15 minutes idle, so the first visit takes around a minute.
+- Search history (SQLite) resets on each deploy. Saved ★ trips live in each visitor's browser.
+- Anyone can use the public site, which spends your Ola Maps quota. Rate limits cap it at
+  30 trip searches per minute per visitor.
+- Python version: `.python-version` (3.14). Server packages: `requirements-deploy.txt`.
+
 ## Architecture
 
 ```
