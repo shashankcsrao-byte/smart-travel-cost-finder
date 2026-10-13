@@ -13,14 +13,14 @@ def test_find_routes_flow(capsys):
     out = capsys.readouterr().out
     assert "College  ->  Airport" in out
     assert "Recommendation (cheapest): Bus at ₹57" in out
-    assert "Fastest option           : Metro in 45 min" in out
+    assert "Fastest option           : Car Taxi (quicker route) in 43 min" in out
 
 
 def test_invalid_inputs_are_handled(capsys):
     run(scripted("9", "2", "Mars", "99", "Hospital", "Airport", "5"))
     out = capsys.readouterr().out
     assert "Invalid choice" in out
-    assert "Unknown location: 'Mars'" in out
+    assert "Unknown location: Mars" in out
     assert "Please enter a number from 1 to 12" in out
     assert "METRO  [NOT AVAILABLE]" in out
 

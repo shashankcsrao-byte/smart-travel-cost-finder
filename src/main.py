@@ -86,14 +86,14 @@ def print_comparison(comparison):
         print("  No transport mode can reach this destination in the sample network.")
         return
 
-    cheapest_modes = {o.mode for o in comparison.tied_cheapest}
-    fastest_modes = {o.mode for o in comparison.tied_fastest}
+    cheapest_id = comparison.cheapest.id      # exactly one cheapest
+    fastest_id = comparison.fastest.id        # exactly one fastest
 
     for rank, option in enumerate(comparison.options, start=1):
         tags = []
-        if option.mode in cheapest_modes:
+        if option.id == cheapest_id:
             tags.append("CHEAPEST")
-        if option.mode in fastest_modes:
+        if option.id == fastest_id:
             tags.append("FASTEST")
         tag_text = f"  [{' | '.join(tags)}]" if tags else ""
 
@@ -112,7 +112,7 @@ def print_comparison(comparison):
     print(f"\n{THIN}")
     print(f"  Recommendation (cheapest): {cheapest.label} at {format_rupees(cheapest.fare)}")
     if len(comparison.tied_cheapest) > 1:
-        others = ", ".join(o.label for o in comparison.tied_cheapest[1:])
+        others = ", ".join(o.label for o in comparison.tied_cheapest if o is not cheapest)
         print(f"    (same fare also by: {others})")
     print(f"  Fastest option           : {fastest.label} in {format_minutes(fastest.time_min)}")
     print("  Times exclude waiting, walking and live traffic.")

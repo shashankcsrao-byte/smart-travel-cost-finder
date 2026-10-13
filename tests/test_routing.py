@@ -189,7 +189,7 @@ def test_fare_matches_route_distance(city):
 def test_college_to_airport_sample_result(city):
     # Values worked out by hand from CONNECTIONS (see docs/VIVA_NOTES.md).
     c = compare_routes(city, "College", "Airport")
-    summary = [(o.mode, o.distance_km, o.time_min, o.fare) for o in c.options]
+    summary = [(o.mode, o.distance_km, o.time_min, o.fare) for o in c.options if o.variant == "cheapest"]
     assert summary == [
         ("bus", 26, 88, 57),
         ("metro", 27, 45, 91),
@@ -201,8 +201,9 @@ def test_college_to_airport_sample_result(city):
 
 def test_cheapest_and_fastest_can_differ(city):
     c = compare_routes(city, "College", "Airport")
-    assert c.cheapest.mode == "bus"
-    assert c.fastest.mode == "metro"
+    assert c.cheapest.id == "bus"
+    # The quickest journey of all is the car's longer ring-road route (43 min).
+    assert c.fastest.id == "car_taxi_fastest" and c.fastest.time_min == 43
 
 
 def test_cheapest_route_differs_from_fastest_route_within_a_mode(city):
