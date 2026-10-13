@@ -1,0 +1,13 @@
+# Web application (backend API + serves the frontend)
+fastapi>=0.115
+uvicorn>=0.30
+# Live mode: HTTP client for the Ola Maps API
+httpx>=0.27
+# Streamlit dashboard (alternative UI)
+streamlit>=1.48
+# Optional route-map drawing for Streamlit (NOT used for route calculation)
+networkx>=3.0
+matplotlib>=3.7
+# Testing
+pytest>=7.0
+httpx2>=2.0
