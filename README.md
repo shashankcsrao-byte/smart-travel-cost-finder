@@ -120,18 +120,20 @@ Notes:
 ## Architecture
 
 ```
-Browser  web/index.html · common.js · app.js (demo) · live.js (live) · Leaflet map
+Browser  web/index.html · styles.css · app.js · motion.js · Leaflet map
    │  fetch("/api/live/plan?from_lat=…")          fetch("/api/routes?source=…")
    ▼
-FastAPI  src/server.py ─ validation, errors (404/422/502/503), JSON
-   │
-   ├─► src/live/planner.py ─┬─► src/live/olamaps.py   Ola Maps: places, directions, distance matrix
-   │                        │       (TTL + LRU cache: src/live/cache.py)
-   │                        ├─► src/live/metro.py     real metro graph → routing.dijkstra()
-   │                        └─► src/live/fares.py     published fare rules with sources
-   ├─► src/routing.py  dijkstra(), compare_routes()   (demo city: src/graph.py, src/fares.py)
-   └─► src/history.py  SQLite: searches, live_searches (parameterised queries)
+C server  backend-c/src/http.c (sockets, threads, gzip) → server.c (security guard, validation,
+   │      errors 404/422/429/502/503, JSON, static files)
+   ├─► planner.c ─┬─► olamaps.c   Ola Maps over HTTPS (libcurl): places, directions, distance matrix
+   │              │                (TTL + LRU cache: cache.c)
+   │              ├─► metro.c     Namma Metro from GTFS: timetable Dijkstra/A*, official fares
+   │              └─► fares.c     published fare rules with sources
+   ├─► routing.c  Dijkstra, A*, Yen, Smart mix (heap.c: binary min-heap; graph.c: demo city)
+   └─► history.c  SQLite: searches, live_searches (parameterised queries)
 ```
+
+The Python modules in `src/` mirror these files one to one (the reference implementation).
 
 ### API endpoints
 
@@ -244,7 +246,11 @@ browser's location.
 ```
 smart-travel-cost-finder/
 ├── web/                     # Frontend: index.html, styles.css, app.js, motion.js (our scroll engine), vendor/
-├── src/
+├── backend-c/               # THE WEB BACKEND, in C (see "C backend" above)
+│   ├── Makefile
+│   └── src/                 # server, http, routing, metro, planner, olamaps, heap, strmap, cache, ...
+├── Dockerfile               # builds and runs the C server (used by Render)
+├── src/                     # Python reference implementation, terminal app, Streamlit
 │   ├── graph.py             # demo city graph (adjacency list)
 │   ├── fares.py             # demo fare rules
 │   ├── routing.py           # dijkstra(), compare_routes()
@@ -261,7 +267,7 @@ smart-travel-cost-finder/
 │       ├── fares.py         # published Bengaluru fare rules
 │       └── planner.py       # builds and ranks live options
 ├── data/bmrcl-gtfs/         # Namma Metro GTFS (ODbL) + attribution
-├── tests/                   # 119 tests (no API key or internet needed)
+├── tests/                   # 121 Python tests (no API key or internet needed)
 ├── tools/build_vendor.py    # copies fonts/icons/Leaflet into web/vendor (offline)
 ├── docs/VIVA_NOTES.md
 ├── app.py                   # Streamlit dashboard
@@ -271,7 +277,8 @@ smart-travel-cost-finder/
 
 ## Tests
 
-`python -m pytest -v` runs 119 tests offline. Ola Maps is replaced by a fake HTTP
+`python -m pytest -v` runs 121 tests offline on the Python reference implementation.
+The C backend was checked against it answer by answer (see **C backend**). Ola Maps is replaced by a fake HTTP
 transport, and the metro tests use the real GTFS file. They cover Dijkstra (including a
 brute-force check), fares, the TTL cache, Ola Maps response parsing and errors, real metro
 routes and interchanges, official fare lookup, operating hours, the live planner, and every
