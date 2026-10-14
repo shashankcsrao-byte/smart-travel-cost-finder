@@ -50,7 +50,7 @@
       res = await fetch(path, { ...options, signal: ctl.signal });
     } catch (err) {
       throw new Error(err.name === "AbortError" ? "The server took too long to answer. Please try again."
-        : "Cannot reach the server. Start it with: python -m src.server");
+        : "Cannot reach the server. Start it with: ./backend-c/build/smart-travel");
     } finally { clearTimeout(timer); }
     const data = await res.json().catch(() => ({}));
     if (!res.ok) {

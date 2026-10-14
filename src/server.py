@@ -11,6 +11,7 @@ Request flow:
                                                     -->  history.py (SQLite)
 """
 
+import hashlib
 import logging
 import math
 import os
@@ -20,7 +21,7 @@ from pathlib import Path
 from urllib.parse import urlparse
 
 from fastapi import FastAPI, HTTPException, Query, Request
-from fastapi.responses import JSONResponse
+from fastapi.responses import HTMLResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from starlette.middleware.trustedhost import TrustedHostMiddleware
 
@@ -51,6 +52,27 @@ CSP = ("default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline';
        "img-src 'self' data: https://tile.openstreetmap.org https://*.tile.openstreetmap.org; "
        "font-src 'self'; connect-src 'self'; frame-ancestors 'none'; base-uri 'self'; form-action 'self'")
 DOC_PATHS = ("/docs", "/redoc", "/openapi.json")
+
+# Our own files are linked as app.js?v=<hash of their contents>, so browsers may keep
+# them for a year: a new deploy changes the hash and therefore the URL.
+VERSIONED_ASSETS = ("styles.css", "motion.js", "app.js", "vendor/fonts.css",
+                    "vendor/leaflet/leaflet.css", "vendor/leaflet/leaflet.js")
+LONG_CACHE = "public, max-age=31536000, immutable"
+VENDOR_CACHE = "public, max-age=604800"          # fonts, icons: a week
+
+
+def versioned_index(web_dir=None):
+    """index.html with ?v=<content hash> on every script and stylesheet link."""
+    web_dir = Path(web_dir or WEB_DIR)
+    html = (web_dir / "index.html").read_text(encoding="utf-8")
+    digest = hashlib.sha256(html.encode("utf-8"))
+    for name in VERSIONED_ASSETS:
+        digest.update((web_dir / name).read_bytes())
+    version = digest.hexdigest()[:12]
+    for name in VERSIONED_ASSETS:
+        for attr in ("src", "href"):
+            html = html.replace(f'{attr}="{name}"', f'{attr}="{name}?v={version}"')
+    return html, version
 
 
 # --------------------------------------------------------------- JSON shapes
@@ -158,6 +180,7 @@ def create_app(db_path=None, maps_client="default", metro="default", allowed_hos
     if os.environ.get("RENDER_EXTERNAL_HOSTNAME"):          # e.g. smart-travel.onrender.com on Render
         hosts.append(os.environ["RENDER_EXTERNAL_HOSTNAME"])
     limiters = {path: SlidingWindowLimiter(n, 60) for path, n in RATE_LIMITS.items()}
+    index_html, asset_version = versioned_index()
 
     @asynccontextmanager
     async def lifespan(_app):
@@ -203,7 +226,12 @@ def create_app(db_path=None, maps_client="default", metro="default", allowed_hos
         if path.startswith("/api/"):
             response.headers["Cache-Control"] = "no-store"
         elif not path.startswith(DOC_PATHS):
-            response.headers["Cache-Control"] = "no-cache"      # always revalidate (ETag)
+            if response.status_code == 200 and request.query_params.get("v") == asset_version:
+                response.headers["Cache-Control"] = LONG_CACHE        # hashed URL never changes
+            elif response.status_code == 200 and path.startswith("/vendor/"):
+                response.headers["Cache-Control"] = VENDOR_CACHE
+            else:
+                response.headers["Cache-Control"] = "no-cache"      # always revalidate (ETag)
             response.headers.setdefault("Content-Security-Policy", CSP)
         return response
 
@@ -440,6 +468,14 @@ def create_app(db_path=None, maps_client="default", metro="default", allowed_hos
     @app.get("/api/live/history", tags=["live"])
     def live_history(limit: int = Query(6, ge=1, le=30)):
         return history.recent_live(limit)
+
+    @app.get("/", include_in_schema=False)
+    @app.get("/index.html", include_in_schema=False)
+    def index(request: Request):
+        etag = f'"{asset_version}"'
+        if request.headers.get("if-none-match") == etag:
+            return HTMLResponse(status_code=304, headers={"ETag": etag})
+        return HTMLResponse(index_html, headers={"ETag": etag})
 
     # The frontend (HTML/CSS/JS). Mounted last so /api/* routes match first.
     app.mount("/", StaticFiles(directory=WEB_DIR, html=True), name="web")

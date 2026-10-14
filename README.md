@@ -2,10 +2,14 @@
 
 **A Graph-Based Multi-Modal Transport Cost Optimization System**
 
-A full-stack web application (HTML/CSS/JS frontend → FastAPI REST backend → Python
-routing engine → SQLite database) that compares the cheapest way to travel by bus,
-metro, auto, bike taxi and cab. The core routing uses a **hand-written Dijkstra's
+A full-stack web application (HTML/CSS/JS frontend → **REST backend written in C** →
+hand-written routing engine → SQLite database) that compares the cheapest way to travel by
+bus, metro, auto, bike taxi and cab. The core routing uses a **hand-written Dijkstra's
 algorithm** with a binary min-heap.
+
+The backend lives in [`backend-c/`](backend-c/) (see **C backend** below). The original Python
+version (`src/`, FastAPI) is kept as the reference implementation and still runs the terminal
+app, the Streamlit dashboard and the Python test suite.
 
 It has two modes:
 
@@ -51,12 +55,45 @@ pip install -r requirements.txt
 3. Check it works: `python -m src.live.check` (makes 3 small test calls).
 4. Restart the server. The key stays on the server; the browser never sees it.
 
+## C backend
+
+The web server is written in C (C11, about 7,400 lines with comments). It answers exactly the same
+`/api/...` requests as the Python version, so the website did not change.
+
+**Build and run** (macOS or Linux; needs a C compiler plus libcurl, SQLite 3 and zlib, which
+macOS already has; on Debian/Ubuntu: `sudo apt install build-essential libcurl4-openssl-dev libsqlite3-dev zlib1g-dev`):
+```bash
+make -C backend-c
+./backend-c/build/smart-travel
+```
+Start it from the project folder: it reads `.env` (for `OLA_MAPS_API_KEY`), serves `web/` and
+loads `data/bmrcl-gtfs/bmrcl.zip`. Open http://localhost:8000.
+
+| File | What it does |
+|---|---|
+| `server.c` | Settings, security guard (host check, cross-site block, rate limits, CSP), every `/api` endpoint, static files, `main()` |
+| `http.c` | HTTP/1.1 server on POSIX sockets: one thread per connection, keep-alive, URL decoding, gzip |
+| `routing.c` | Dijkstra and A* (one search, binary heap, lazy deletion), Yen's k-shortest paths, Smart mix state graph, ranking |
+| `metro.c` | Namma Metro from GTFS: calendar, timetable Dijkstra/A* with binary search for the next train, static graph, official fares, replay trace |
+| `planner.c` | Live trip planner: prices walk, auto, cab, bike taxi, bus and metro; road and metro lookups run in parallel threads |
+| `olamaps.c` | Ola Maps client over HTTPS (libcurl) with a shared connection pool and caches |
+| `heap.c`, `strmap.c`, `cache.c`, `ratelimit.c` | Hand-written data structures: binary min-heap, hash map, TTL + LRU cache (hash map + doubly linked list), sliding-window rate limiter (ring buffer) |
+| `graph.c`, `fares.c` | Demo city graph (adjacency list) and fare rules |
+| `json.c`, `csv.c`, `zipread.c`, `history.c`, `util.c` | JSON writer and parser, CSV reader, ZIP reader (zlib), SQLite history, helpers |
+
+**How it was checked.** The C server and the Python server were run side by side and their JSON
+compared answer by answer: 1,354 requests (every demo route for all 144 place pairs and 3
+priorities, Yen alternatives, errors, the metro network and 300+ Dijkstra/A* timetable traces)
+and 803 live trip plans against the same fake map service: **0 differences**. It also ran
+clean under AddressSanitizer and served 2,000 requests from 64 parallel clients in under half
+a second. The metro timetable loads in about 60 ms.
+
 ## Run
 
 | What | Command | Open |
 |---|---|---|
-| **Web app** (main) | `python -m src.server` | http://localhost:8000 |
-| API docs | (same server) | http://localhost:8000/docs |
+| **Web app** (main, C backend) | `make -C backend-c && ./backend-c/build/smart-travel` | http://localhost:8000 |
+| Web app (Python reference) | `python -m src.server` | http://localhost:8000 (API docs at `/docs`) |
 | Terminal app (demo data) | `python -m src.main` | |
 | Streamlit dashboard (demo data) | `streamlit run app.py` | http://localhost:8501 |
 | Tests | `python -m pytest -v` | |
@@ -69,7 +106,7 @@ The repo includes `render.yaml`, so Render can set the service up for you.
 2. Choose **New → Blueprint**, then pick this repository.
 3. When asked for `OLA_MAPS_API_KEY`, paste your Ola Maps key. It stays in Render's settings
    and is never in the code.
-4. Wait for the build (2 to 4 minutes). Your site is then at `https://<name>.onrender.com`.
+4. Wait for the Docker build (3 to 5 minutes). Your site is then at `https://<name>.onrender.com`.
 
 Notes:
 - Every `git push` to `main` redeploys automatically.
@@ -77,7 +114,8 @@ Notes:
 - Search history (SQLite) resets on each deploy. Saved ★ trips live in each visitor's browser.
 - Anyone can use the public site, which spends your Ola Maps quota. Rate limits cap it at
   30 trip searches per minute per visitor.
-- Python version: `.python-version` (3.14). Server packages: `requirements-deploy.txt`.
+- Render builds the C server from the `Dockerfile` (Debian + libcurl, SQLite, zlib) and runs it
+  as a non-root user. Build locally with `docker build -t smart-travel .`
 
 ## Architecture
 

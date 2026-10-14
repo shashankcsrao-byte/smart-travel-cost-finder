@@ -1,12 +1,11 @@
 # Render Blueprint: New > Blueprint > pick this repo. Render reads this file.
+# The backend is written in C; Render builds it from the Dockerfile.
 services:
   - type: web
     name: smart-travel-cost-finder
-    runtime: python
+    runtime: docker
     plan: free
-    buildCommand: pip install -r requirements-deploy.txt
-    # --proxy-headers so rate limits see each visitor's real IP behind Render's proxy.
-    startCommand: uvicorn src.server:create_app --factory --host 0.0.0.0 --port $PORT --proxy-headers --forwarded-allow-ips "*"
+    dockerfilePath: ./Dockerfile
     healthCheckPath: /api/health
     autoDeploy: true
     envVars:
