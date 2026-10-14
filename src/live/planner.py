@@ -16,6 +16,7 @@ Exactly one option is marked cheapest and exactly one fastest.
 """
 
 import json
+from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime, timedelta
 from urllib.parse import urlencode
 
@@ -101,8 +102,12 @@ def plan_metro(maps, metro, origin, destination, depart, priority="cheapest"):
     station_point = lambda s: (s["lat"], s["lng"])
     approximate = False
     try:
-        to_station = maps.distance_matrix([o_point], [station_point(s) for s, _ in starts])[0]
-        from_station = [row[0] for row in maps.distance_matrix([station_point(s) for s, _ in ends], [d_point])]
+        # Both lookups at once: each is a network round trip to Ola Maps.
+        with ThreadPoolExecutor(max_workers=2) as pool:
+            to_job = pool.submit(maps.distance_matrix, [o_point], [station_point(s) for s, _ in starts])
+            from_job = pool.submit(maps.distance_matrix, [station_point(s) for s, _ in ends], [d_point])
+            to_station = to_job.result()[0]
+            from_station = [row[0] for row in from_job.result()]
     except OlaMapsError:
         approximate = True
         to_station, from_station = [None] * len(starts), [None] * len(ends)
@@ -183,7 +188,11 @@ def plan_metro(maps, metro, origin, destination, depart, priority="cheapest"):
 def plan_trip(maps, metro, origin, destination, now=None, priority="cheapest"):
     depart = (now or datetime.now(IST)).astimezone(IST)
     hour = depart.hour
-    road = maps.directions((origin["lat"], origin["lng"]), (destination["lat"], destination["lng"]))
+    # The metro search needs no road data, so it runs while the road route is fetched.
+    with ThreadPoolExecutor(max_workers=1) as pool:
+        metro_job = pool.submit(plan_metro, maps, metro, origin, destination, depart, priority) if metro else None
+        road = maps.directions((origin["lat"], origin["lng"]), (destination["lat"], destination["lng"]))
+        metro_option, metro_reason = metro_job.result() if metro_job else (None, None)
     km, minutes = road["distance_km"], road["duration_min"]
     road_leg = _leg("road", origin["name"], destination["name"], km, minutes, polyline=road["polyline"])
 
@@ -243,11 +252,10 @@ def plan_trip(maps, metro, origin, destination, now=None, priority="cheapest"):
     if metro is None:
         unavailable.append({"mode": "metro", "label": "Namma Metro", "reason": "Metro data not loaded"})
     else:
-        metro_option, reason = plan_metro(maps, metro, origin, destination, depart, priority)
         if metro_option:
             options.append(metro_option)
         else:
-            unavailable.append({"mode": "metro", "label": "Namma Metro", "reason": reason})
+            unavailable.append({"mode": "metro", "label": "Namma Metro", "reason": metro_reason})
 
     options.sort(key=lambda o: rank_key(o, priority))
     cheapest = min(options, key=lambda o: rank_key(o, "cheapest"))

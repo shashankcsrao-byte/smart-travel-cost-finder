@@ -1,0 +1,13 @@
+.git
+.venv
+.env
+**/__pycache__
+.pytest_cache
+.coverage
+travel_history.db
+backend-c/build
+tools/vendor/node_modules
+scrollcraft
+web_legacy
+docs
+tests

@@ -410,3 +410,40 @@ def test_alternatives_and_reverse_endpoints(api):
     assert alts[0]["distance_km"] <= alts[1]["distance_km"] <= alts[2]["distance_km"]
     assert client.get("/api/live/reverse", params={"lat": 12.95, "lng": 77.58}).json()["name"] == "Pinned"
     assert client.get("/api/routes", params={"source": "   ", "destination": "Airport"}).status_code == 422
+
+
+def test_assets_are_versioned_and_cached_long(api):
+    import re
+    client, _ = api
+    page = client.get("/")
+    version = re.search(r'src="app\.js\?v=(\w+)"', page.text).group(1)
+    assert f'href="styles.css?v={version}"' in page.text
+    assert client.get("/", headers={"If-None-Match": page.headers["etag"]}).status_code == 304
+    js = client.get(f"/app.js?v={version}")
+    assert js.status_code == 200 and "immutable" in js.headers["cache-control"]
+    assert client.get("/app.js").headers["cache-control"] == "no-cache"          # unversioned: revalidate
+    assert client.get("/app.js?v=old").headers["cache-control"] == "no-cache"    # stale version: no pinning
+    assert "max-age=604800" in client.get("/vendor/icons.svg").headers["cache-control"]
+
+
+@needs_metro
+def test_plan_fetches_road_and_metro_lookups_in_parallel(metro):
+    import time
+
+    class SlowMaps(FakeMaps):
+        def directions(self, a, b):
+            time.sleep(0.3)
+            return super().directions(a, b)
+
+        def distance_matrix(self, origins, destinations):
+            time.sleep(0.3)                          # one round trip for the whole matrix
+            return [[{k: v for k, v in FakeMaps.directions(self, o, d).items() if k != "polyline"}
+                     for d in destinations] for o in origins]
+
+    origin = {"name": "Indiranagar", "lat": 12.9784, "lng": 77.6408}
+    destination = {"name": "Majestic", "lat": 12.9757, "lng": 77.5728}
+    start = time.perf_counter()
+    result = plan_trip(SlowMaps(), metro, origin, destination, now=datetime(2026, 10, 14, 10, 0, tzinfo=IST))
+    took = time.perf_counter() - start
+    assert any(o["mode"] == "metro" for o in result["options"])
+    assert took < 0.6          # three 0.3 s lookups one after another would take 0.9 s
