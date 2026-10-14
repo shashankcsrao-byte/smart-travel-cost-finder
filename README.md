@@ -7,9 +7,7 @@ hand-written routing engine → SQLite database) that compares the cheapest way 
 bus, metro, auto, bike taxi and cab. The core routing uses a **hand-written Dijkstra's
 algorithm** with a binary min-heap.
 
-The backend lives in [`backend-c/`](backend-c/) (see **C backend** below). The original Python
-version (`src/`, FastAPI) is kept as the reference implementation and still runs the terminal
-app, the Streamlit dashboard and the Python test suite.
+The backend lives in [`backend-c/`](backend-c/) (see **C backend** below).
 
 It has two modes:
 
@@ -30,21 +28,11 @@ It has two modes:
 
 ## Setup (one time)
 
-Requires Python 3.10 or newer. Run these commands from the `smart-travel-cost-finder` folder.
+Needs a C compiler and three libraries: libcurl, SQLite 3 and zlib.
 
-**macOS / Linux**
-```bash
-python3 -m venv .venv
-source .venv/bin/activate
-pip install -r requirements.txt
-```
-
-**Windows (PowerShell)**
-```powershell
-py -m venv .venv
-.venv\Scripts\Activate.ps1
-pip install -r requirements.txt
-```
+- **macOS:** install the Xcode command line tools (`xcode-select --install`). The libraries are already there.
+- **Debian / Ubuntu:** `sudo apt install build-essential libcurl4-openssl-dev libsqlite3-dev zlib1g-dev`
+- **Windows:** use WSL (Ubuntu) with the line above, or Docker (`docker build -t smart-travel .`).
 
 ### Turn on live mode
 1. Create a free account at [maps.olakrutrim.com](https://maps.olakrutrim.com) and create an **API key**.
@@ -52,13 +40,13 @@ pip install -r requirements.txt
    ```
    OLA_MAPS_API_KEY=your-key-here
    ```
-3. Check it works: `python -m src.live.check` (makes 3 small test calls).
-4. Restart the server. The key stays on the server; the browser never sees it.
+3. Start the server and open http://localhost:8000/api/live/status: `maps_configured` should be `true`.
+4. Restart the server after changing the key. The key stays on the server; the browser never sees it.
 
 ## C backend
 
-The web server is written in C (C11, about 7,400 lines with comments). It answers exactly the same
-`/api/...` requests as the Python version, so the website did not change.
+The web server is written in C (C11, about 7,400 lines with comments). It replaced an earlier
+Python (FastAPI) version and answers exactly the same `/api/...` requests, so the website did not change.
 
 **Build and run** (macOS or Linux; needs a C compiler plus libcurl, SQLite 3 and zlib, which
 macOS already has; on Debian/Ubuntu: `sudo apt install build-essential libcurl4-openssl-dev libsqlite3-dev zlib1g-dev`):
@@ -81,7 +69,7 @@ loads `data/bmrcl-gtfs/bmrcl.zip`. Open http://localhost:8000.
 | `graph.c`, `fares.c` | Demo city graph (adjacency list) and fare rules |
 | `json.c`, `csv.c`, `zipread.c`, `history.c`, `util.c` | JSON writer and parser, CSV reader, ZIP reader (zlib), SQLite history, helpers |
 
-**How it was checked.** The C server and the Python server were run side by side and their JSON
+**How it was checked.** Before the Python version was removed, the two servers were run side by side and their JSON
 compared answer by answer: 1,354 requests (every demo route for all 144 place pairs and 3
 priorities, Yen alternatives, errors, the metro network and 300+ Dijkstra/A* timetable traces)
 and 803 live trip plans against the same fake map service: **0 differences**. It also ran
@@ -92,11 +80,8 @@ a second. The metro timetable loads in about 60 ms.
 
 | What | Command | Open |
 |---|---|---|
-| **Web app** (main, C backend) | `make -C backend-c && ./backend-c/build/smart-travel` | http://localhost:8000 |
-| Web app (Python reference) | `python -m src.server` | http://localhost:8000 (API docs at `/docs`) |
-| Terminal app (demo data) | `python -m src.main` | |
-| Streamlit dashboard (demo data) | `streamlit run app.py` | http://localhost:8501 |
-| Tests | `python -m pytest -v` | |
+| **Web app** | `make -C backend-c && ./backend-c/build/smart-travel` | http://localhost:8000 |
+| Docker | `docker build -t smart-travel . && docker run -p 8000:10000 --env-file .env smart-travel` | http://localhost:8000 |
 
 ## Deploy (Render, free plan)
 
@@ -132,8 +117,6 @@ C server  backend-c/src/http.c (sockets, threads, gzip) → server.c (security g
    ├─► routing.c  Dijkstra, A*, Yen, Smart mix (heap.c: binary min-heap; graph.c: demo city)
    └─► history.c  SQLite: searches, live_searches (parameterised queries)
 ```
-
-The Python modules in `src/` mirror these files one to one (the reference implementation).
 
 ### API endpoints
 
@@ -222,7 +205,7 @@ score, feel check and screenshot evidence are in `scrollcraft/builds/smart-trave
 | **Namma Metro** | Walk (≤ 1 km) or auto to one of the 3 nearest stations → **our Dijkstra** on the real network → walk or auto to the destination. Includes average waiting time (half the line's headway, from the timetable) and line changes | Official BMRCL station-to-station fare (token/QR). Smart-card peak and off-peak prices shown too | Official fare |
 | **Auto** (Namma Yatri, meter autos) | Live road route (Ola Maps) | Govt meter rate (Aug 2025): ₹36 for 2 km + ₹18/km, +50% from 10 PM to 5 AM | Govt rate |
 | **Cab** (Uber, Ola) | Live road route | Govt uniform taxi fare (Feb 2025): ₹100 for 4 km + ₹24/km. Apps may add surge or fees | Govt rate |
-| **Bike taxi** (Rapido, Uber Moto) | Live road route | No official rate card, so indicative ₹20 + ₹8/km (edit `src/live/fares.py`) | Indicative |
+| **Bike taxi** (Rapido, Uber Moto) | Live road route | No official rate card, so indicative ₹20 + ₹8/km (edit `backend-c/src/fares.c`) | Indicative |
 | **BMTC bus** | Road time × 1.5 + 8 min average wait (estimate) | ₹6 / ₹12 / ₹18 up to 6 km (Jan 2025). Longer trips are **estimated** as the 2020 slabs × 1.2 (the verified ratio): ≈₹24 up to 14 km, ≈₹30 up to 40 km, ≈₹36 beyond | Official / Estimated |
 
 Other live behaviour: metro is marked unavailable outside its operating hours (from the
@@ -232,8 +215,8 @@ browser's location.
 
 ## The core algorithm (both modes)
 
-- The graph is an **adjacency list** `dict[location] → list[Edge]`.
-- **Dijkstra** uses `heapq` with lazy deletion of stale entries, a `parent` map for path
+- The graph is an **adjacency list**: for every place, an array of `Edge` structs (`graph.c`).
+- **Dijkstra** uses our own binary min-heap (`heap.c`) with lazy deletion of stale entries, a `parent` map for path
   reconstruction, and early exit at the destination. It takes `O((V + E) log V)` time.
 - Demo city: one run per mode, minimising **distance** (fare = base + per_km × distance,
   so shortest = cheapest).
@@ -250,39 +233,17 @@ smart-travel-cost-finder/
 │   ├── Makefile
 │   └── src/                 # server, http, routing, metro, planner, olamaps, heap, strmap, cache, ...
 ├── Dockerfile               # builds and runs the C server (used by Render)
-├── src/                     # Python reference implementation, terminal app, Streamlit
-│   ├── graph.py             # demo city graph (adjacency list)
-│   ├── fares.py             # demo fare rules
-│   ├── routing.py           # dijkstra(), compare_routes()
-│   ├── server.py            # FastAPI backend
-│   ├── history.py           # SQLite history
-│   ├── main.py              # terminal app
-│   ├── visualize.py         # Matplotlib map for Streamlit
-│   └── live/
-│       ├── ratelimit.py     # sliding-window rate limiter
-│       ├── settings.py      # .env loading, paths
-│       ├── olamaps.py       # Ola Maps client
-│       ├── cache.py         # TTL + LRU cache
-│       ├── metro.py         # real Namma Metro graph, fares, hours
-│       ├── fares.py         # published Bengaluru fare rules
-│       └── planner.py       # builds and ranks live options
 ├── data/bmrcl-gtfs/         # Namma Metro GTFS (ODbL) + attribution
-├── tests/                   # 121 Python tests (no API key or internet needed)
 ├── tools/build_vendor.py    # copies fonts/icons/Leaflet into web/vendor (offline)
 ├── docs/VIVA_NOTES.md
-├── app.py                   # Streamlit dashboard
-├── .env.example             # copy to .env and add your key
-└── requirements.txt
+└── .env.example             # copy to .env and add your key
 ```
 
-## Tests
+## Verification
 
-`python -m pytest -v` runs 121 tests offline on the Python reference implementation.
-The C backend was checked against it answer by answer (see **C backend**). Ola Maps is replaced by a fake HTTP
-transport, and the metro tests use the real GTFS file. They cover Dijkstra (including a
-brute-force check), fares, the TTL cache, Ola Maps response parsing and errors, real metro
-routes and interchanges, official fare lookup, operating hours, the live planner, and every
-API endpoint.
+The C backend was checked answer by answer against the earlier Python version (with its 121
+tests) before that version was removed: 0 differences across 2,157 requests, clean under
+AddressSanitizer. See **C backend** above.
 
 ## Data sources and credits
 
