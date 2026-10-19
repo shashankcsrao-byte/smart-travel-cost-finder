@@ -1,0 +1,380 @@
+/* ==========================================================================
+   Smart Travel · spatial layer
+   The page as a room you stand in: a dark space with light and a floor,
+   frosted glass windows floating in it, ornaments (the navigation) hovering
+   beside them, and surfaces that light up where the pointer rests.
+
+     room      .room            fixed backdrop: glows, a receding floor, dust
+     windows   glass + rim      .hero__left .mapcard .run .rate .system__wrap .again__inner
+     platters  lighter fills    fields, trip options, chips, bento tiles
+     ornaments floating pills   brand, tab bar, data source, replay controls
+
+   spatial.js feeds the depth: --px/--py (pointer, -1..1) on <html>,
+   --mx/--my (pointer inside a surface) and --d/--ad (fare card offset).
+   ========================================================================== */
+
+:root {
+  --room: #08060A;
+  --glass: linear-gradient(155deg, rgba(255, 255, 255, 0.13), rgba(255, 255, 255, 0.04) 46%, rgba(255, 255, 255, 0.07));
+  --glass-tint: rgba(22, 16, 24, 0.42);
+  --glass-blur: blur(30px) saturate(165%);
+  --glass-lift: inset 0 1px 0 rgba(255, 255, 255, 0.2), 0 44px 90px -34px rgba(0, 0, 0, 0.8), 0 18px 36px -20px rgba(0, 0, 0, 0.6);
+  --rim: linear-gradient(160deg, rgba(255, 255, 255, 0.5), rgba(255, 255, 255, 0.08) 34%, rgba(255, 255, 255, 0.03) 62%, rgba(255, 255, 255, 0.22));
+  --menu-bg: rgba(28, 21, 30, 0.95);
+  --r-window: 36px;
+  --rail: 0px;                           /* room kept free for the side tab bar */
+  --float: cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+body { background: var(--room); }
+
+/* ------------------------------------------------------------------ room -- */
+.room { position: fixed; inset: 0; z-index: -1; overflow: hidden; pointer-events: none; }
+.room > * { position: absolute; }
+.room__glow {
+  width: 70vmax; height: 70vmax; border-radius: 50%;
+  translate: calc(var(--px, 0) * var(--depth) * -1) calc(var(--py, 0) * var(--depth) * -1);
+  transition: translate 900ms var(--float);
+  animation: drift 32s ease-in-out infinite alternate;
+}
+.room__glow--a { left: -22vmax; top: -30vmax; --depth: 26px; background: radial-gradient(closest-side, rgb(var(--kumkum-rgb) / 0.22), transparent); }
+.room__glow--b { right: -26vmax; top: 6vh; --depth: 40px; background: radial-gradient(closest-side, rgb(var(--lotus-rgb) / 0.18), transparent); animation-duration: 41s; animation-delay: -12s; }
+.room__glow--c { left: 18vw; bottom: -46vmax; width: 60vmax; height: 60vmax; --depth: 54px; background: radial-gradient(closest-side, rgb(var(--turmeric-rgb) / 0.13), transparent); animation-duration: 37s; animation-delay: -20s; }
+@keyframes drift {
+  from { transform: translate3d(0, 0, 0) scale(1); }
+  to { transform: translate3d(6vw, 4vh, 0) scale(1.12); }
+}
+
+/* The floor: a grid laid flat and receding to a lit horizon, slowly moving toward you. */
+.room__floor {
+  left: -40vw; right: -40vw; bottom: 0; height: 46vh; perspective: 520px; perspective-origin: 50% 0;
+  translate: calc(var(--px, 0) * -30px) 0; transition: translate 900ms var(--float);
+  -webkit-mask-image: linear-gradient(to top, #000 0%, rgba(0, 0, 0, 0.6) 45%, transparent 100%);
+  mask-image: linear-gradient(to top, #000 0%, rgba(0, 0, 0, 0.6) 45%, transparent 100%);
+}
+.room__grid {
+  position: absolute; left: 0; right: 0; top: 0; height: 300%;
+  transform-origin: 50% 0; transform: rotateX(78deg);
+  background-image:
+    linear-gradient(rgb(var(--turmeric-rgb) / 0.13) 1px, transparent 1px),
+    linear-gradient(90deg, rgb(var(--turmeric-rgb) / 0.13) 1px, transparent 1px);
+  background-size: 72px 72px;
+  animation: approach 7s linear infinite;
+}
+@keyframes approach {
+  from { transform: rotateX(78deg) translate3d(0, -72px, 0); }
+  to { transform: rotateX(78deg) translate3d(0, 0, 0); }
+}
+.room__horizon {
+  left: 0; right: 0; bottom: 46vh; height: 1px; translate: 0 0.5px;
+  background: linear-gradient(90deg, transparent, rgb(var(--turmeric-rgb) / 0.5) 28%, rgb(var(--kumkum-rgb) / 0.5) 52%, rgb(var(--lotus-rgb) / 0.5) 76%, transparent);
+  box-shadow: 0 0 40px 10px rgb(var(--kumkum-rgb) / 0.12);
+}
+.room__dust {
+  inset: -10%;
+  background-image:
+    radial-gradient(1.4px 1.4px at 20px 30px, rgba(255, 255, 255, 0.55), transparent),
+    radial-gradient(1px 1px at 140px 90px, rgba(255, 255, 255, 0.4), transparent),
+    radial-gradient(1.2px 1.2px at 260px 170px, rgba(200, 210, 255, 0.45), transparent),
+    radial-gradient(1px 1px at 80px 220px, rgba(255, 255, 255, 0.3), transparent);
+  background-size: 320px 260px;
+  opacity: 0.55;
+  translate: calc(var(--px, 0) * -12px) calc(var(--py, 0) * -8px);
+  transition: translate 900ms var(--float);
+  animation: dust 90s linear infinite;
+}
+@keyframes dust { to { transform: translate3d(-320px, -260px, 0); } }
+
+/* --------------------------------------------------------------- glass -- */
+:is(.mapcard, .run, .rate, .system__wrap, .again__inner, .scrubber, .snack, .tabs, .brand, .seg),
+.hero__left {
+  background: var(--glass), var(--glass-tint);
+  -webkit-backdrop-filter: var(--glass-blur);
+  backdrop-filter: var(--glass-blur);
+  box-shadow: var(--glass-lift);
+}
+/* A rim that catches light from the top left, drawn as a 1px gradient border. */
+:is(.mapcard, .run, .rate, .system__wrap, .again__inner, .hero__left)::before {
+  content: ""; position: absolute; inset: 0; z-index: 1001; border-radius: inherit; padding: 1px; pointer-events: none;
+  background: var(--rim);
+  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor;
+  mask: linear-gradient(#000 0 0) content-box exclude, linear-gradient(#000 0 0);
+}
+/* Window grabber: the small bar under a window that says "this floats". */
+:is(.hero__right, .system__wrap, .again__inner)::after,
+.hero__left::after {
+  content: ""; position: absolute; left: 50%; bottom: -22px; width: 112px; height: 6px; translate: -50% 0;
+  border-radius: 99px; background: rgba(255, 255, 255, 0.24); pointer-events: none;
+}
+
+/* ------------------------------------------------------------ ornaments -- */
+.appbar {
+  background: none; border: 0; box-shadow: none; pointer-events: none;
+  padding-inline: 18px; gap: 12px; top: 14px; height: 56px;
+}
+.appbar.is-raised { box-shadow: none; }
+.appbar > * { pointer-events: auto; }
+.brand { height: 52px; padding: 0 18px 0 10px; border-radius: 999px; }
+.seg { padding: 5px; height: 52px; align-items: center; border-radius: 999px; }
+.seg__btn { height: 42px; padding: 0 16px; }
+
+/* Wide screens: the tabs become a vertical ornament floating at the left edge,
+   icons only, opening to show their names when the pointer or focus reaches it. */
+@media (min-width: 1101px) {
+  :root { --rail: 92px; }
+  .tabs {
+    position: fixed; left: 18px; top: 50%; translate: 0 -50%; z-index: 61;
+    flex-direction: column; gap: 6px; margin: 0; padding: 8px; border-radius: 34px;
+  }
+  .tabs + .seg { margin-left: auto; }
+  .tab {
+    height: 48px; min-width: 48px; padding: 0 14px; justify-content: flex-start; gap: 0;
+    font-size: 0; border-radius: 999px;
+    transition: font-size 200ms var(--ease-emph), gap 200ms var(--ease-emph), background-color 160ms, color 160ms;
+  }
+  .tabs:is(:hover, :focus-within) .tab { font-size: 0.94rem; gap: 12px; padding-right: 20px; }
+}
+/* Narrower: one floating pill across the top holds everything. */
+@media (max-width: 1100px) {
+  .appbar {
+    inset: 10px 10px auto 10px; height: 60px; padding-inline: 8px; border-radius: 999px; pointer-events: auto;
+    background: var(--glass), var(--glass-tint); -webkit-backdrop-filter: var(--glass-blur); backdrop-filter: var(--glass-blur);
+    box-shadow: var(--glass-lift);
+  }
+  .appbar :is(.brand, .seg, .tabs) { background: none; -webkit-backdrop-filter: none; backdrop-filter: none; box-shadow: none; }
+  .seg { background: rgba(0, 0, 0, 0.28); height: 46px; }
+  .seg__btn { height: 36px; }
+}
+
+/* ------------------------------------------------------ the plan window -- */
+.hero { padding-left: calc(clamp(16px, 3vw, 40px) + var(--rail)); }
+.hero__title { text-shadow: 0 2px 30px rgba(0, 0, 0, 0.35); }
+.hero__accent {
+  /* Two identical colour runs side by side, so sliding by one run loops without a seam. */
+  background: linear-gradient(100deg, #FFF1A8, var(--turmeric) 16.6%, var(--kumkum-lite) 33.3%, #FFF1A8 50%, var(--turmeric) 66.6%, var(--kumkum-lite) 83.3%, #FFF1A8) 0 0 / 200% 100%;
+  -webkit-background-clip: text; background-clip: text; color: transparent;
+}
+@media (min-width: 901px) {
+  .hero__left { position: relative; border-radius: var(--r-window); padding: clamp(22px, 2.4vw, 34px); }
+  .hero__grid { perspective: 2400px; }
+}
+@media (max-width: 900px) {
+  /* The plan window dissolves into its parts (display: contents), so it draws no glass. */
+  .hero__left { background: none; -webkit-backdrop-filter: none; backdrop-filter: none; box-shadow: none; }
+  .hero__left::before, .hero__left::after, .hero__right::after { display: none; }
+}
+.mapcard { border-radius: var(--r-window); }
+.mapcard__cap { border-top-color: rgba(255, 255, 255, 0.08); }
+
+/* Platters: lighter or recessed fills inside a window, no blur of their own. */
+.planner { position: relative; z-index: 5; background: rgba(0, 0, 0, 0.16); box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.06); border-radius: 28px; }
+.field { background: rgba(255, 255, 255, 0.05); }
+.field:hover { background: rgba(255, 255, 255, 0.08); }
+.field:focus-within { background: rgba(0, 0, 0, 0.28); box-shadow: inset 0 0 0 2px var(--t-accent), 0 0 24px -6px rgb(var(--turmeric-rgb) / 0.5); }
+.swap { box-shadow: 0 10px 24px -8px rgba(0, 0, 0, 0.7), 0 0 0 4px rgba(255, 255, 255, 0.06); }
+.chip { position: relative; background: rgba(255, 255, 255, 0.07); border-color: rgba(255, 255, 255, 0.12); }
+.chip { height: auto; min-height: 34px; padding-block: 5px; text-align: left; }   /* long saved trips wrap inside the chip */
+.opt { position: relative; background: rgba(255, 255, 255, 0.06); box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.08), inset 0 0 0 1px rgba(255, 255, 255, 0.06); }
+.opt.is-sel { background: rgba(255, 255, 255, 0.12); box-shadow: 0 24px 48px -24px rgba(0, 0, 0, 0.8), inset 0 0 0 1.5px rgba(255, 255, 255, 0.75), 0 0 30px -10px rgb(var(--turmeric-rgb) / 0.45); }
+.opt--off { background: transparent; }
+.app { position: relative; }
+
+/* Menus open on top of other glass, so they are nearly solid to stay readable. */
+.menu {
+  background: var(--menu-bg); -webkit-backdrop-filter: blur(24px); backdrop-filter: blur(24px);
+  box-shadow: 0 30px 60px -20px rgba(0, 0, 0, 0.85), inset 0 0 0 1px rgba(255, 255, 255, 0.1);
+}
+
+/* --------------------------------------------- hover: the gaze highlight -- */
+/* Where the pointer rests, the surface brightens around it (the visionOS hover effect). */
+:is(.opt, .chip, .tile, .field, .app, .rate)::after {
+  content: ""; position: absolute; inset: 0; border-radius: inherit; pointer-events: none;
+  background: radial-gradient(260px circle at var(--mx, 50%) var(--my, 50%), rgba(255, 255, 255, 0.13), transparent 70%);
+  opacity: 0; transition: opacity 240ms var(--ease-emph);
+}
+@media (hover: hover) and (pointer: fine) {
+  :is(.opt, .chip, .tile, .field, .app, .rate):hover::after { opacity: 1; }
+  .opt:not(.opt--off):hover { transform: translateY(-3px) scale(1.012); }
+  :is(.icon-btn, .pri__btn, .seg__btn, .algo__btn, .when__now):not([aria-checked="true"]):hover { background-color: rgba(255, 255, 255, 0.12); }
+  .icon-btn:hover { transform: scale(1.06); }
+}
+
+/* ------------------------------------------- depth that follows the pointer -- */
+@media (hover: hover) and (pointer: fine) and (prefers-reduced-motion: no-preference) and (min-width: 901px) {
+  /* The two plan windows curve gently round you, and lean a little toward the pointer. */
+  .hero__left {
+    transform-origin: 100% 50%;
+    transform: rotateY(calc(2.2deg + var(--px, 0) * 1.1deg)) rotateX(calc(var(--py, 0) * -0.7deg));
+    transition: transform 900ms var(--float);
+  }
+  .mapcard {
+    transform-origin: 0 50%;
+    transform: perspective(2400px) rotateY(calc(-2.2deg + var(--px, 0) * 1.1deg)) rotateX(calc(var(--py, 0) * -0.7deg));
+    transition: transform 900ms var(--float);
+  }
+}
+
+/* ------------------------------------------------------------- the hush -- */
+.hush__panel { padding-left: calc(clamp(20px, 8vw, 120px) + var(--rail) * 0.5); }
+.hush__line { text-shadow: 0 0 46px rgb(var(--turmeric-rgb) / 0.3); }
+.hush__meta code { background: rgba(255, 255, 255, 0.1); }
+
+/* ---------------------------------------------- the peak: a metro volume -- */
+/* The metro map lies on a table in front of you; the run panel floats beside it. */
+.peak__stage::before {
+  content: ""; position: absolute; left: var(--rail); right: 420px; top: 30%; bottom: 4%;
+  background: radial-gradient(closest-side, rgb(var(--lotus-rgb) / 0.18), transparent 75%);
+  pointer-events: none;
+}
+@media (min-width: 1081px) {
+  .metro { left: var(--rail); width: calc(100% - 420px - var(--rail)); }
+  .scrubber { left: calc(clamp(16px, 3vw, 40px) + var(--rail)); width: calc(100% - 420px - clamp(32px, 6vw, 80px) - var(--rail)); }
+}
+@media (prefers-reduced-motion: no-preference) {
+  .metro {
+    transform-origin: 50% 60%;
+    transform: perspective(1600px) rotateX(calc(16deg + var(--py, 0) * -3deg)) rotateY(calc(var(--px, 0) * 4deg));
+    transition: transform 900ms var(--float);
+  }
+}
+.m-edge { stroke: rgba(242, 243, 247, 0.18); }
+.m-edge.on { stroke-opacity: 0.8; }
+.run { border-radius: 32px; }
+.run__stats div, .run__heap li, .run__log li { background: rgba(255, 255, 255, 0.06); }
+.scrubber { padding: 6px 16px 6px 8px; border-radius: 999px; bottom: 16px; }
+
+/* ------------------------------------------- fares: a wall of cards round you -- */
+.rail { padding-left: calc(clamp(16px, 5vw, 72px) + var(--rail)); }
+.rate { position: relative; border-radius: 32px; }
+.ic.rate__icon { background: rgba(255, 255, 255, 0.1); }
+.rate.is-in .ic.rate__icon { box-shadow: 0 0 30px -6px rgba(255, 255, 255, 0.45); }
+@media (prefers-reduced-motion: no-preference) {
+  .rate { transform: perspective(760px) rotateY(calc(var(--d, 0) * -34deg)) scale(calc(1 - var(--ad, 0) * 0.06)); }
+}
+
+/* --------------------------------------------------------------- system -- */
+.system { padding-left: calc(clamp(16px, 5vw, 72px) + var(--rail)); }
+.system__wrap { position: relative; border-radius: var(--r-window); padding: clamp(22px, 3vw, 40px); }
+
+/* ---------------------------------------------------------------- again -- */
+.again__inner { position: relative; border-radius: var(--r-window); padding: clamp(24px, 3vw, 40px); }
+.again__field { background: rgba(0, 0, 0, 0.22); box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.1); }
+
+/* ------------------------------------------------------- floating extras -- */
+[data-progress] { box-shadow: 0 0 12px var(--t-accent); }
+.snack { border: 1px solid rgba(255, 255, 255, 0.12); }
+.savings { box-shadow: 0 16px 34px -12px rgba(0, 0, 0, 0.7), 0 0 26px -8px rgba(255, 255, 255, 0.5); }
+.maphint { -webkit-backdrop-filter: blur(16px); backdrop-filter: blur(16px); box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.12); }
+
+/* ---------------------------------------------------- the map, at night -- */
+/* Tiles are inverted to a dark map; routes and pins sit above them untouched. */
+.leaflet-container { background: #0E1117; }
+.leaflet-tile-pane { filter: invert(1) hue-rotate(180deg) brightness(0.92) contrast(0.9) saturate(0.5); }
+.leaflet-bar { border: 1px solid rgba(255, 255, 255, 0.14) !important; border-radius: 14px !important; overflow: hidden; box-shadow: 0 10px 24px -10px rgba(0, 0, 0, 0.8) !important; }
+.leaflet-bar a, .leaflet-bar a:hover { background: rgba(22, 25, 34, 0.88); color: #F5F6FA; border-bottom-color: rgba(255, 255, 255, 0.1); }
+.leaflet-bar a:hover { background: rgba(44, 48, 60, 0.95); }
+.leaflet-container .leaflet-control-attribution { background: rgba(8, 10, 15, 0.66); color: #AEB3C0; }
+.leaflet-control-attribution a { color: var(--turmeric); }
+.leaflet-popup-content-wrapper, .leaflet-popup-tip { background: var(--menu-bg); color: var(--t-ink); box-shadow: 0 20px 40px -14px rgba(0, 0, 0, 0.85); }
+.leaflet-tooltip { background: var(--menu-bg); color: var(--t-ink); border: 1px solid rgba(255, 255, 255, 0.14); box-shadow: 0 10px 24px -10px rgba(0, 0, 0, 0.8); }
+.leaflet-tooltip-top::before { border-top-color: var(--menu-bg); }
+.leaflet-tooltip-bottom::before { border-bottom-color: var(--menu-bg); }
+.leaflet-tooltip-left::before { border-left-color: var(--menu-bg); }
+.leaflet-tooltip-right::before { border-right-color: var(--menu-bg); }
+
+/* ------------------------------------------------------------ responsive -- */
+@media (max-width: 900px) {
+  /* Without the plan window around it, the planner carries the glass itself. */
+  .planner { background: var(--glass), var(--glass-tint); -webkit-backdrop-filter: var(--glass-blur); backdrop-filter: var(--glass-blur); box-shadow: var(--glass-lift); }
+  .room__floor { height: 34vh; }
+  .room__horizon { bottom: 34vh; }
+}
+@media (max-width: 760px) {
+  :root { --r-window: 28px; --appbar-h: 80px; }
+  .brand { padding-right: 10px; }
+}
+
+/* ------------------------------------------------------------ the emblem -- */
+/* The peacock on the lotus appears twice: a faint carving in the room behind every
+   section, and one medallion standing on the plan window of the landing page. */
+.seal {
+  display: block; flex: none; border-radius: 50%;
+  box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.16), 0 12px 30px -10px rgb(var(--kumkum-rgb) / 0.6), 0 0 44px -12px rgb(var(--turmeric-rgb) / 0.5);
+  transition: transform 1s var(--float);
+}
+.seal--hero {
+  position: absolute; z-index: 1002; top: -54px; right: clamp(20px, 2.4vw, 34px);
+  width: clamp(88px, 8vw, 112px); height: auto; aspect-ratio: 1;
+}
+.brand__mark { transition: transform 1s var(--float); }
+@media (hover: hover) and (pointer: fine) {
+  .seal:hover, .brand:hover .brand__mark { transform: perspective(600px) rotateY(360deg); }
+}
+.hero__title { max-width: min(15ch, calc(100% - 84px)); }
+
+/* A faint carving of the emblem in the room, swaying slowly, deeper than the glow. */
+.room__emblem {
+  right: -8vmax; top: 14vh; width: min(62vmax, 760px); height: auto; opacity: 0.05;
+  -webkit-mask-image: radial-gradient(closest-side, #000 40%, transparent);
+  mask-image: radial-gradient(closest-side, #000 40%, transparent);
+  translate: calc(var(--px, 0) * -50px) calc(var(--py, 0) * -36px);
+  transition: translate 1200ms var(--float);
+  animation: emblem-sway 26s ease-in-out infinite alternate;
+}
+@keyframes emblem-sway {
+  from { transform: rotate(-6deg) scale(1); }
+  to { transform: rotate(6deg) scale(1.06); }
+}
+@media (max-width: 900px) {
+  .room__emblem { right: -34vw; top: 28vh; width: 110vw; }
+  .seal--hero { position: absolute; top: 4px; right: 0; width: 64px; }
+  .hero__grid { position: relative; }
+  .hero__title { max-width: calc(100% - 72px); }
+}
+
+/* -------------------------------------------------------------- arrivals -- */
+@media (prefers-reduced-motion: no-preference) {
+  /* On load the ornaments drift in, the plan windows rise out of the room and the title focuses. */
+  .brand { animation: ornament-down 800ms var(--float) backwards 100ms; }
+  .seg { animation: ornament-down 800ms var(--float) backwards 220ms; }
+  .tabs { animation: ornament-side 900ms var(--float) backwards 320ms; }
+  .hero__left { animation: window-in 1100ms var(--float) backwards 120ms; }
+  .hero__right { animation: window-in 1100ms var(--float) backwards 300ms; }
+  .hero__title { animation: blur-in 1000ms var(--float) backwards 380ms; }
+  .hero__sub { animation: blur-in 1000ms var(--float) backwards 520ms; }
+  .hero__accent { animation: sheen 8s linear infinite; }
+
+  /* The emblem turns in from the depth of the room, then floats; the logo spins while a trip is compared. */
+  .seal--hero { animation: seal-in 1400ms var(--float) backwards 700ms, seal-float 6s ease-in-out 2100ms infinite; }
+  body:has(#opts[aria-busy="true"]) .brand__mark { animation: seal-spin 1.1s linear infinite; }
+
+  /* Small things that are alive: the savings badge floats, the destination pin breathes. */
+  .savings { animation: pop 460ms var(--ease-emph) 420ms both, bob 6s ease-in-out 1.2s infinite; }
+  .pin--b { animation: pin-glow 2.2s var(--ease-emph) infinite; }
+
+  /* Further down, each window rises in the first time it scrolls into view (spatial.js adds .is-in). */
+  .has-spatial :is(.system__wrap, .again__inner, .run):not(.is-in) { opacity: 0; }
+  :is(.system__wrap, .again__inner, .run).is-in { animation: window-in 1000ms var(--float) backwards; }
+}
+@keyframes window-in { from { opacity: 0; transform: perspective(1400px) translate3d(0, 40px, -220px) rotateX(10deg); } }
+@keyframes ornament-down { from { opacity: 0; transform: translateY(-24px) scale(0.9); } }
+@keyframes ornament-side { from { opacity: 0; transform: translateX(-30px) scale(0.9); } }
+@keyframes blur-in { from { opacity: 0; filter: blur(14px); transform: translateY(12px); } }
+@keyframes sheen { to { background-position: -100% 0; } }
+@keyframes bob { 50% { translate: 0 -5px; } }
+@keyframes seal-in { from { opacity: 0; transform: perspective(600px) translateZ(-260px) rotateY(-200deg); } }
+@keyframes seal-float { 50% { translate: 0 -8px; } }
+@keyframes seal-spin { to { transform: perspective(600px) rotateY(360deg); } }
+@keyframes pin-glow {
+  from { box-shadow: 0 0 0 0 rgb(var(--kumkum-rgb) / 0.7), 0 2px 6px rgba(0, 0, 0, 0.35); }
+  to { box-shadow: 0 0 0 16px rgb(var(--kumkum-rgb) / 0), 0 2px 6px rgba(0, 0, 0, 0.35); }
+}
+
+/* --------------------------------------------------------- reduced motion -- */
+@media (prefers-reduced-motion: reduce) {
+  .room__glow, .room__grid, .room__dust, .room__emblem { animation: none; }
+  .seal, .brand__mark { transition: none; }
+  .room > * { translate: none !important; transition: none; }
+  .tab { transition: none; }
+}

@@ -74,7 +74,7 @@
     official: "Official fare", regulated: "Govt rate", estimated: "Estimated", partial: "Partial fare data",
     indicative: "Indicative", sample: "Sample data", free: "Free",
   };
-  const MODE_STROKE = { bus: "#16181D", metro: "#304FFE", bike_taxi: "#0B7A54", car_taxi: "#B8336A" };
+  const MODE_STROKE = { bus: "#E8EAF0", metro: "#B9A6F2", bike_taxi: "#3DDC97", car_taxi: "#FF7AB6" };   // read on a dark map
   const fareText = (o) => (o.fare_kind === "estimated" ? `≈ ${rupees(o.fare)}` : o.fare_kind === "partial" ? `${rupees(o.fare)}+` : o.fare === 0 ? "Free" : rupees(o.fare));
   const isLight = (hex) => /^#?FFDF00$/i.test(hex || "");      // the Yellow Line needs dark text
 
@@ -610,12 +610,12 @@
           const next = o.legs[i + 1];
           const end = i === 0 && next && next.coords ? next.coords[0] : b;
           const start = i === 0 ? a : cursor;
-          L.polyline([start, end], { color: leg.kind === "walk" ? "#16181D" : "#304FFE", weight: 4, dashArray: "6 8" }).addTo(S.layers);
+          L.polyline([start, end], { color: leg.kind === "walk" ? "#F5F6FA" : "#FADF63", weight: 4, dashArray: "6 8" }).addTo(S.layers);
         }
       });
     } else {
       const path = roadPath(r);
-      L.polyline(path, { color: "#16181D", weight: 7, opacity: 0.9, dashArray: o.mode === "bus" || o.mode === "walk" ? "12 9" : null }).addTo(S.layers);
+      L.polyline(path, { color: "#F5F6FA", weight: 7, opacity: 0.9, dashArray: o.mode === "bus" || o.mode === "walk" ? "12 9" : null }).addTo(S.layers);
       pts.push(...path);
     }
     const pin = (cls) => L.divIcon({ className: "", html: `<div class="pin ${cls}"></div>`, iconSize: [26, 26], iconAnchor: [13, 13] });
@@ -649,7 +649,7 @@
       parts.push(`<line class="dm-edge${metro ? " dm-edge--metro" : ""}" x1="${pos[a][0]}" y1="${pos[a][1]}" x2="${pos[b][0]}" y2="${pos[b][1]}"/>`);
     }
     (o.legs || []).forEach((leg) => {
-      const color = o.variant === "mixed" ? (MODE_STROKE[leg.mode] || "#304FFE") : "#304FFE";
+      const color = o.variant === "mixed" ? (MODE_STROKE[leg.mode] || "#FADF63") : "#FADF63";
       parts.push(`<line class="dm-route" style="stroke:${color}" x1="${pos[leg.from][0]}" y1="${pos[leg.from][1]}" x2="${pos[leg.to][0]}" y2="${pos[leg.to][1]}"/>`);
     });
     const ends = [r.origin.name, r.destination.name];

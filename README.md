@@ -105,7 +105,7 @@ Notes:
 ## Architecture
 
 ```
-Browser  web/index.html · styles.css · app.js · motion.js · Leaflet map
+Browser  web/index.html · styles.css · spatial.css · bento.css · app.js · motion.js · spatial.js · Leaflet map
    │  fetch("/api/live/plan?from_lat=…")          fetch("/api/routes?source=…")
    ▼
 C server  backend-c/src/http.c (sockets, threads, gzip) → server.c (security guard, validation,
@@ -192,10 +192,16 @@ score, feel check and screenshot evidence are in `scrollcraft/builds/smart-trave
   the real 251-state metro graph: stations settle one by one, the min-heap and log update, then
   the route lights up in its line colours with the official fare. Tap any station, or use the
   selects, to replay to it. The slider is the same playhead for keyboard users.
-- **Fares**, the rate cards with sources, slide sideways. **System** shows real counts read
-  from the backend. The page ends on a "Where to next?" input.
-- Material Design roles on black and white with one Indigo accent, Material Symbols icons,
-  Outfit and Geist type. Respects reduced motion. Works on phones.
+- **Fares**, the rate cards with sources, slide sideways as a curved wall that turns to face
+  you. **System** is a bento grid of real counts read from the backend, beside small animated
+  tiles for the min-heap, Dijkstra/A*/Yen and the C HTTP server. The page ends on a
+  "Where to next?" input.
+- **Spatial UI** (in the style of visionOS): frosted glass windows float in a dark 3D room
+  with lights and a receding floor. The tab bar and controls float as separate pills, and
+  windows lean toward the pointer. The peacock-on-lotus emblem stands on the landing page and
+  is carved faintly into the room.
+- Colours come from the emblem: turmeric yellow (accent), kumkum red and lotus violet.
+  Material Symbols icons, Outfit and Geist type. Respects reduced motion. Works on phones.
 - The previous frontend is kept in `web_legacy/` for reference.
 
 ## Live mode: what each number means
@@ -228,7 +234,8 @@ browser's location.
 
 ```
 smart-travel-cost-finder/
-├── web/                     # Frontend: index.html, styles.css, app.js, motion.js (our scroll engine), vendor/
+├── web/                     # Frontend: index.html, styles.css + spatial.css + bento.css, app.js,
+│                            #   motion.js (scroll engine), spatial.js (depth), brand/ (emblem), vendor/
 ├── backend-c/               # THE WEB BACKEND, in C (see "C backend" above)
 │   ├── Makefile
 │   └── src/                 # server, http, routing, metro, planner, olamaps, heap, strmap, cache, ...

@@ -5,14 +5,28 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Smart Travel · cheapest way there</title>
 <meta name="description" content="Compare walk, bus, metro, auto, bike taxi and cab across Bengaluru, ranked by your priority, with routes found by hand-written Dijkstra, A* and a real metro timetable search.">
-<meta name="theme-color" content="#F7F7FA">
-<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' rx='9' fill='%2316181D'/><circle cx='10' cy='22' r='3.4' fill='%23fff'/><circle cx='22' cy='10' r='3.4' fill='%23AAB6FF'/><path d='M10 22 C10 14 22 18 22 10' stroke='%23fff' stroke-width='2.4' fill='none' stroke-linecap='round'/></svg>">
+<meta name="theme-color" content="#08060A">
+<link rel="icon" type="image/png" sizes="32x32" href="brand/favicon-32.png">
+<link rel="apple-touch-icon" href="brand/apple-touch-icon.png">
 <!-- Everything is served locally: the site works with no internet (except live data and map tiles). -->
 <link rel="stylesheet" href="vendor/fonts.css">
 <link rel="stylesheet" href="vendor/leaflet/leaflet.css">
 <link rel="stylesheet" href="styles.css">
+<link rel="stylesheet" href="spatial.css">
+<link rel="stylesheet" href="bento.css">
 </head>
 <body data-mode="live">
+
+<!-- The room the glass windows float in: light, a receding floor and dust (spatial.css). -->
+<div class="room" aria-hidden="true">
+  <div class="room__glow room__glow--a"></div>
+  <div class="room__glow room__glow--b"></div>
+  <div class="room__glow room__glow--c"></div>
+  <div class="room__dust"></div>
+  <img class="room__emblem" src="brand/emblem-640.webp" alt="" width="640" height="640" decoding="async">
+  <div class="room__horizon"></div>
+  <div class="room__floor"><div class="room__grid"></div></div>
+</div>
 
 <span data-progress></span>
 <a class="skip" href="#plan-from">Skip to the trip planner</a>
@@ -41,6 +55,7 @@
   <section class="hero" id="plan" aria-labelledby="hero-title">
     <div class="hero__grid">
       <div class="hero__left">
+        <img class="seal seal--hero" src="brand/emblem-256.webp" alt="" width="116" height="116" decoding="async">
         <h1 class="hero__title" id="hero-title">The cheapest way there, <span class="hero__accent">already ranked.</span></h1>
         <p class="hero__sub" id="hero-sub">Walk, bus, metro, auto, bike taxi and cab on live Bengaluru roads.</p>
 
@@ -188,21 +203,48 @@
     </div>
   </section>
 
-  <!-- 5 · CONFIDENCE. Telemetry read from the running backend, not typed in. -->
+  <!-- 5 · CONFIDENCE. A bento of live telemetry read from the running backend, and the
+       data structures behind it, each tile with a small working picture of itself. -->
   <section class="system" id="system" data-act="flow" aria-labelledby="sys-title">
-    <div class="system__wrap" data-in data-stagger="60">
+    <div class="system__wrap">
       <h2 class="system__title" id="sys-title"><i class="ic" data-i="monitoring"></i>System status</h2>
-      <p class="system__lede">Read from the running backend.</p>
-      <dl class="tele">
-        <div class="tele__cell tele__cell--wide"><dt>Metro stations in the graph</dt><dd><span id="tc-stations" class="nums" data-count>0</span></dd></div>
-        <div class="tele__cell"><dt>Metro lines</dt><dd><span id="tc-lines" class="nums" data-count>0</span></dd></div>
-        <div class="tele__cell"><dt>Graph states</dt><dd><span id="tc-states" class="nums" data-count>0</span></dd></div>
-        <div class="tele__cell"><dt>Demo locations</dt><dd><span id="tc-demo" class="nums" data-count>0</span></dd></div>
-        <div class="tele__cell"><dt>Demo connections</dt><dd><span id="tc-conn" class="nums" data-count>0</span></dd></div>
-        <div class="tele__cell"><dt>Map calls today</dt><dd><span id="tc-calls" class="nums">n/a</span></dd></div>
-        <div class="tele__cell"><dt>Last comparison took</dt><dd><span id="tc-ms">n/a</span></dd></div>
-        <div class="tele__cell"><dt>Metro timetable valid for</dt><dd><span id="tc-feed">n/a</span></dd></div>
-        <div class="tele__cell"><dt>Road data</dt><dd id="tc-maps">checking</dd></div>
+      <p class="system__lede">Live numbers read from the running C backend, beside the parts that produce them.</p>
+      <dl class="bento" id="bento">
+        <div class="tile tile--hero" style="--area: st">
+          <dt><i class="ic" data-i="subway"></i>Metro stations in the graph</dt>
+          <dd><span id="tc-stations" class="nums" data-count>0</span></dd>
+          <dd class="tile__art" aria-hidden="true"><svg class="tile__metro" viewBox="0 0 240 120">
+            <path class="tm-line tm-line--a" pathLength="100" d="M10 100 C70 100 80 20 140 20 S220 40 230 40"/>
+            <path class="tm-line tm-line--b" pathLength="100" d="M20 20 C80 30 100 110 170 100 S220 70 232 90"/>
+            <g class="tm-stops"><circle cx="10" cy="100" r="3.5"/><circle cx="62" cy="88" r="3.5"/><circle cx="104" cy="44" r="3.5"/><circle cx="140" cy="20" r="3.5"/><circle cx="186" cy="27" r="3.5"/><circle cx="230" cy="40" r="3.5"/>
+              <circle cx="20" cy="20" r="3.5"/><circle cx="72" cy="40" r="3.5"/><circle cx="170" cy="100" r="3.5"/><circle cx="232" cy="90" r="3.5"/></g>
+            <circle class="tm-train tm-train--a" r="5"><animateMotion dur="6s" repeatCount="indefinite" path="M10 100 C70 100 80 20 140 20 S220 40 230 40"/></circle>
+            <circle class="tm-train tm-train--b" r="5"><animateMotion dur="7.5s" begin="-2s" repeatCount="indefinite" keyPoints="1;0" keyTimes="0;1" calcMode="linear" path="M20 20 C80 30 100 110 170 100 S220 70 232 90"/></circle>
+          </svg></dd>
+        </div>
+        <div class="tile tile--feature" style="--area: heap">
+          <dt><i class="ic" data-i="timeline"></i>Binary min-heap</dt>
+          <dd class="tile__text">Dijkstra always takes the cheapest place next. <code>heap.c</code> pops it in O(log n).</dd>
+          <dd class="tile__art" aria-hidden="true"><ol class="heapviz"><li style="--h:22"></li><li style="--h:38"></li><li style="--h:31"></li><li style="--h:64"></li><li style="--h:50"></li><li style="--h:82"></li><li style="--h:71"></li><li style="--h:95"></li></ol></dd>
+        </div>
+        <div class="tile" style="--area: ln"><dt><i class="ic" data-i="route"></i>Metro lines</dt><dd><span id="tc-lines" class="nums" data-count>0</span></dd></div>
+        <div class="tile" style="--area: gs"><dt><i class="ic" data-i="alt_route"></i>Graph states</dt><dd><span id="tc-states" class="nums" data-count>0</span></dd></div>
+        <div class="tile tile--speed" style="--area: ms"><dt><i class="ic" data-i="bolt"></i>Last comparison took</dt><dd><span id="tc-ms">n/a</span></dd><dd class="tile__art" aria-hidden="true"><span class="tile__beam"></span></dd></div>
+        <div class="tile" style="--area: dl"><dt><i class="ic" data-i="pin_drop"></i>Demo locations</dt><dd><span id="tc-demo" class="nums" data-count>0</span></dd></div>
+        <div class="tile" style="--area: dc"><dt><i class="ic" data-i="link"></i>Demo connections</dt><dd><span id="tc-conn" class="nums" data-count>0</span></dd></div>
+        <div class="tile tile--feature" style="--area: algo">
+          <dt><i class="ic" data-i="route"></i>Dijkstra, A* and Yen</dt>
+          <dd class="tile__text">One search in <code>routing.c</code> finds the best path; Yen's algorithm finds the next best ones.</dd>
+          <dd class="tile__art" aria-hidden="true"><svg class="pathviz" viewBox="0 0 260 120">
+            <g class="pv-edges"><path d="M20 60 L80 20 L150 30 L240 60 M20 60 L70 100 L150 90 L240 60 M80 20 L70 100 M150 30 L150 90 M80 20 L150 90"/></g>
+            <path class="pv-best" pathLength="100" d="M20 60 L80 20 L150 90 L240 60"/>
+            <g class="pv-nodes"><circle cx="20" cy="60" r="7"/><circle cx="80" cy="20" r="6"/><circle cx="150" cy="30" r="6"/><circle cx="70" cy="100" r="6"/><circle cx="150" cy="90" r="6"/><circle cx="240" cy="60" r="7"/></g>
+          </svg></dd>
+        </div>
+        <div class="tile tile--wide" style="--area: map"><dt><i class="ic" data-i="verified"></i>Road data</dt><dd id="tc-maps">checking</dd></div>
+        <div class="tile tile--wide" style="--area: feed"><dt><i class="ic" data-i="schedule"></i>Metro timetable valid for</dt><dd><span id="tc-feed">n/a</span></dd></div>
+        <div class="tile" style="--area: calls"><dt><i class="ic" data-i="near_me"></i>Map calls today</dt><dd><span id="tc-calls" class="nums">n/a</span></dd></div>
+        <div class="tile tile--srv" style="--area: srv"><dt><i class="ic" data-i="monitoring"></i>Own HTTP server</dt><dd class="tile__text"><code>http.c</code>: sockets, keep-alive, gzip</dd><dd class="tile__art" aria-hidden="true"><span class="tile__pulse"></span></dd></div>
       </dl>
       <p class="system__warn" id="tc-warn" hidden></p>
     </div>
@@ -222,7 +264,7 @@
         <p class="again__hint">From <b id="again-from">your start</b>. Pick a place and the comparison runs at the top.</p>
       </div>
       <footer class="foot">
-        <p>Smart Travel Cost Finder · college DSA project · Python, FastAPI, SQLite, hand-written Dijkstra, A* and Yen's algorithm.</p>
+        <p>Smart Travel Cost Finder · college DSA project · C11 with its own HTTP server, SQLite, hand-written Dijkstra, A* and Yen's algorithm.</p>
         <p>Road times: Ola Maps. Metro: BMRCL via Namma Metro GTFS (ODbL). Map tiles © OpenStreetMap contributors. Icons: Material Symbols (Apache 2.0). Fonts: Outfit, Geist (OFL). Fares are official, Govt-notified, estimated or indicative, as labelled.</p>
       </footer>
     </div>
@@ -235,5 +277,6 @@
 <script src="vendor/leaflet/leaflet.js"></script>
 <script src="motion.js"></script>
 <script src="app.js"></script>
+<script src="spatial.js"></script>
 </body>
 </html>

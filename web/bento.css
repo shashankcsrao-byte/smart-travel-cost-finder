@@ -1,0 +1,168 @@
+/* ==========================================================================
+   Smart Travel · the System bento
+   Live telemetry and the data structures behind it, as a bento grid of glass
+   tiles of different sizes. Feature tiles carry a small working picture:
+   trains running on two metro lines, a min-heap popping its smallest item,
+   a shortest path drawing itself across a graph.
+
+   Each tile names its place with --area (set in the markup). spatial.js adds
+   .is-in when the grid scrolls into view (tiles then rise out of the room one
+   by one), numbers each tile with --i, and feeds --tx/--ty for the hover tilt.
+   ========================================================================== */
+
+@property --spin { syntax: "<angle>"; initial-value: 0deg; inherits: false; }
+
+.system__wrap { max-width: 1180px; }
+.bento {
+  margin: 0; display: grid; gap: 14px;
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+  grid-auto-rows: minmax(150px, auto);
+  grid-template-areas:
+    "st   st   heap heap ln    gs"
+    "st   st   heap heap ms    ms"
+    "dl   dc   algo algo map   map"
+    "feed feed algo algo calls srv";
+}
+
+/* ----------------------------------------------------------------- tiles -- */
+.tile {
+  grid-area: var(--area); position: relative; overflow: hidden; isolation: isolate;
+  display: flex; flex-direction: column; gap: 8px; padding: 18px 20px; border-radius: 26px;
+  background: linear-gradient(160deg, rgba(255, 255, 255, 0.085), rgba(255, 255, 255, 0.025));
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.09), inset 0 0 0 1px rgba(255, 255, 255, 0.06);
+  transition: transform 420ms var(--float), box-shadow 300ms var(--ease-emph), background-color 300ms;
+}
+.tile dt {
+  display: flex; align-items: center; gap: 8px;
+  font: 600 0.72rem var(--t-font-mono); letter-spacing: 0.08em; text-transform: uppercase; color: var(--t-ink-soft);
+}
+.tile dt .ic { width: 18px; height: 18px; color: var(--t-accent); }
+.tile dd {
+  margin: 0; font-family: var(--t-font-display); font-weight: 700; letter-spacing: -0.03em;
+  font-size: clamp(1.8rem, 1.2rem + 1.4vw, 2.6rem); line-height: 1.05; font-variant-numeric: tabular-nums;
+}
+.tile dd.tile__text { font: 400 0.92rem/1.5 var(--t-font-text); letter-spacing: 0; color: var(--t-ink-soft); max-width: 34ch; }
+.tile code { font-family: var(--t-font-mono); font-size: 0.86em; color: var(--t-ink); background: rgba(255, 255, 255, 0.08); padding: 1px 6px; border-radius: 6px; }
+.tile dd.tile__art { margin-top: auto; font-size: 0; line-height: 0; }
+
+@media (hover: hover) and (pointer: fine) {
+  .tile:hover {
+    transform: perspective(900px) rotateX(calc(var(--ty, 0) * -6deg)) rotateY(calc(var(--tx, 0) * 6deg)) translateY(-4px);
+    background-color: rgba(255, 255, 255, 0.04);
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.14), inset 0 0 0 1px rgba(255, 255, 255, 0.12), 0 30px 50px -26px rgba(0, 0, 0, 0.9);
+  }
+}
+
+/* Feature tiles wear a slowly turning light around their edge. */
+:is(.tile--hero, .tile--feature)::before {
+  content: ""; position: absolute; inset: 0; z-index: 2; border-radius: inherit; padding: 1.2px; pointer-events: none;
+  background: conic-gradient(from var(--spin), transparent 0 64%, rgb(var(--turmeric-rgb) / 0.9) 78%, rgb(var(--kumkum-rgb) / 0.85) 88%, transparent 97%);
+  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor;
+  mask: linear-gradient(#000 0 0) content-box exclude, linear-gradient(#000 0 0);
+  animation: edge-spin 7s linear infinite;
+}
+.tile--feature::before { animation-duration: 9s; animation-direction: reverse; }
+@keyframes edge-spin { to { --spin: 360deg; } }
+
+/* ------------------------------------------------- hero tile: metro lines -- */
+.tile--hero { background: radial-gradient(120% 90% at 0% 0%, rgb(var(--kumkum-rgb) / 0.2), transparent 60%), linear-gradient(160deg, rgba(255, 255, 255, 0.09), rgba(255, 255, 255, 0.02)); }
+.tile--hero dd:not(.tile__art) {
+  font-size: clamp(3.4rem, 2.2rem + 4vw, 6rem);
+  background: linear-gradient(100deg, #FFFFFF, #FFF1A8 40%, var(--turmeric) 65%, var(--kumkum-lite));
+  -webkit-background-clip: text; background-clip: text; color: transparent;
+}
+.tile__metro { width: 100%; height: auto; overflow: visible; }
+.tm-line { fill: none; stroke-width: 4; stroke-linecap: round; opacity: 0.85; }
+.tm-line--a { stroke: #A64CA6; }                  /* Purple Line */
+.tm-line--b { stroke: #2BA84A; }                  /* Green Line */
+.tm-stops circle { fill: #0B0D12; stroke: rgba(255, 255, 255, 0.8); stroke-width: 1.6; }
+.tm-train { fill: #FFFFFF; filter: drop-shadow(0 0 6px rgba(255, 255, 255, 0.9)); }
+
+/* ---------------------------------------------------- heap tile: the pop -- */
+.heapviz { list-style: none; margin: 0; padding: 0; height: 96px; display: flex; align-items: flex-end; gap: 7px; }
+.heapviz li {
+  flex: 1; height: calc(var(--h) * 1%); border-radius: 8px 8px 4px 4px;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.3), rgba(255, 255, 255, 0.06));
+  transform-origin: 50% 100%;
+  animation: heap-breathe 2.8s ease-in-out infinite; animation-delay: calc(var(--h) * -28ms);
+}
+.heapviz li:first-child {
+  background: linear-gradient(180deg, #FFF1A8, var(--t-accent));
+  box-shadow: 0 0 18px -2px rgb(var(--turmeric-rgb) / 0.75);
+  animation: heap-pop 2.8s var(--float) infinite;
+}
+@keyframes heap-breathe { 50% { transform: scaleY(0.9); } }
+@keyframes heap-pop {
+  0%, 20% { transform: none; opacity: 1; }
+  45% { transform: translateY(-46px) scale(1.15); opacity: 0; }
+  46%, 70% { transform: translateY(18px); opacity: 0; }
+  100% { transform: none; opacity: 1; }
+}
+
+/* ------------------------------------------- path tile: the best route -- */
+.pathviz { width: 100%; height: auto; overflow: visible; }
+.pv-edges path { fill: none; stroke: rgba(255, 255, 255, 0.16); stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+.pv-best {
+  fill: none; stroke: var(--t-accent); stroke-width: 5; stroke-linecap: round; stroke-linejoin: round;
+  filter: drop-shadow(0 0 6px rgb(var(--turmeric-rgb) / 0.75));
+  stroke-dasharray: 100; animation: path-draw 3.6s var(--float) infinite;
+}
+@keyframes path-draw {
+  0% { stroke-dashoffset: 100; opacity: 1; }
+  55%, 85% { stroke-dashoffset: 0; opacity: 1; }
+  100% { stroke-dashoffset: 0; opacity: 0; }
+}
+.pv-nodes circle { fill: #12151D; stroke: rgba(255, 255, 255, 0.55); stroke-width: 2; }
+.pv-nodes circle:is(:first-child, :last-child) { fill: var(--t-accent); stroke: #FFFFFF; }
+
+/* ------------------------------------------- small tiles: speed and server -- */
+.tile__beam {
+  display: block; height: 4px; border-radius: 99px;
+  background: linear-gradient(90deg, transparent, var(--t-accent), var(--kumkum-lite), transparent) 0 0 / 200% 100%;
+  animation: beam 2.2s linear infinite;
+}
+@keyframes beam { from { background-position: 100% 0; } to { background-position: -100% 0; } }
+.tile__pulse { position: absolute; right: 18px; top: 18px; width: 10px; height: 10px; border-radius: 50%; background: #34C759; box-shadow: 0 0 12px #34C759; }
+.tile__pulse::after { content: ""; position: absolute; inset: 0; border-radius: 50%; border: 2px solid #34C759; animation: pulse 1.6s var(--ease-emph) infinite; }
+.tile--srv .tile__art { margin-top: 0; }
+
+/* ------------------------------------------------------ entrance from depth -- */
+@media (prefers-reduced-motion: no-preference) {
+  .has-spatial .bento:not(.is-in) > .tile { opacity: 0; }
+  .bento.is-in > .tile { animation: tile-in 900ms var(--float) backwards; animation-delay: calc(var(--i, 0) * 70ms); }
+  .bento.is-in .tm-line { stroke-dasharray: 100; animation: line-draw 1.8s var(--float) backwards 500ms; }
+}
+@keyframes tile-in {
+  from { opacity: 0; transform: perspective(900px) translate3d(0, 46px, -180px) rotateX(20deg); }
+}
+@keyframes line-draw { from { stroke-dashoffset: 100; } to { stroke-dashoffset: 0; } }
+
+/* ------------------------------------------------------------ responsive -- */
+@media (max-width: 1100px) {
+  .bento {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    grid-template-areas:
+      "st   st   heap heap"
+      "st   st   heap heap"
+      "ln   gs   ms   ms"
+      "dl   dc   map  map"
+      "algo algo feed feed"
+      "algo algo calls srv";
+  }
+}
+@media (max-width: 600px) {
+  .bento {
+    gap: 10px; grid-auto-rows: minmax(120px, auto);
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    grid-template-areas: "st st" "heap heap" "ln gs" "ms ms" "dl dc" "algo algo" "map map" "feed feed" "calls srv";
+  }
+  .tile { padding: 16px; border-radius: 22px; }
+  .tile--hero, .tile--feature { min-height: 230px; }
+}
+
+/* --------------------------------------------------------- reduced motion -- */
+@media (prefers-reduced-motion: reduce) {
+  .tile, .tile::before, .heapviz li, .pv-best, .tile__beam, .tile__pulse::after { animation: none !important; transition: none; }
+  .tm-train { display: none; }
+}

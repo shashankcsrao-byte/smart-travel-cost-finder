@@ -58,8 +58,9 @@
 
 /* Our own files are linked as app.js?v=<hash of their contents>, so browsers may keep them for a
    year: a new deploy changes the hash and therefore the URL. */
-static const char *const VERSIONED_ASSETS[] = {"styles.css", "motion.js", "app.js", "vendor/fonts.css",
-                                               "vendor/leaflet/leaflet.css", "vendor/leaflet/leaflet.js"};
+static const char *const VERSIONED_ASSETS[] = {"styles.css", "spatial.css", "bento.css", "motion.js", "app.js",
+                                               "spatial.js", "vendor/fonts.css", "vendor/leaflet/leaflet.css",
+                                               "vendor/leaflet/leaflet.js"};
 
 typedef struct {
     Graph *graph;
