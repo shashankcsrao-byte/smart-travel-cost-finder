@@ -34,9 +34,10 @@ const char *const BIKE_SOURCE =
     "No official bike-taxi rate card is published for Karnataka, so this is an "
     "indicative estimate. Check the app for the real price.";
 const char *const BMTC_SOURCE =
-    "BMTC ordinary fares: ₹6 / ₹12 / ₹18 up to 6 km (Jan 2025 revision). Longer trips are "
-    "estimated as the 2020 slabs x 1.2 (≈₹24 up to 14 km, ≈₹30 up to 40 km, ≈₹36 beyond). "
-    "Check the official BMTC fare chart for the exact amount.";
+    "BMTC ordinary fares from 5 Nov 2026: ₹10 / ₹18 / ₹25 for the first three stages (about 6 km). "
+    "Longer trips are estimated from the fares BMTC published to named places "
+    "(≈₹30 up to 10 km, ≈₹35 up to 14 km, ≈₹38 up to 20 km, ≈₹40 up to 30 km, ≈₹42 up to 38 km, "
+    "≈₹44 up to 45 km, ₹45 maximum). Check the Namma BMTC app for the exact amount.";
 
 /* Minimum fare covers the first min_km; each further km costs per_km. */
 static double distance_fare(double min_fare, double min_km, double per_km, double km) {
@@ -59,19 +60,23 @@ long cab_fare(double km) { return py_round_int(distance_fare(CAB_MIN_FARE, CAB_M
 long bike_fare(double km) { return py_round_int(distance_fare(BIKE_MIN_FARE, 0, BIKE_PER_KM, km)); }
 
 long bmtc_fare(double km, int *exact) {
-    /* First three stages: Jan 2025 revision. Longer trips: the 2020 slabs x 1.2, because the
-       verified 2025 stages are exactly 1.2 x the 2020 ones (5 -> 6, 10 -> 12, 15 -> 18). */
-    static const double verified[][2] = {{2, 6}, {4, 12}, {6, 18}};
-    static const double estimated[][2] = {{14, 24}, {40, 30}, {INFINITY, 36}};
-    for (int i = 0; i < 3; i++)
+    /* 5 Nov 2026 revision. The first three stages (about 2 km each) are the published
+       ₹10 / ₹18 / ₹25. BMTC published the longer fares only as fares from Majestic to named
+       places (Hebbal ₹30, Jayanagar ₹35, Jambusavari Dinne ₹38, Nelamangala ₹40, Attibele ₹42,
+       Harohalli ₹44, ₹45 maximum), so those slabs are estimates set by the road distances. */
+    static const double verified[][2] = {{2, 10}, {4, 18}, {6, 25}};
+    static const double estimated[][2] = {{10, 30}, {14, 35}, {20, 38}, {30, 40}, {38, 42}, {45, 44}};
+    const int nverified = (int)(sizeof verified / sizeof *verified);
+    const int nestimated = (int)(sizeof estimated / sizeof *estimated);
+    for (int i = 0; i < nverified; i++)
         if (km <= verified[i][0]) {
             *exact = 1;
             return (long)verified[i][1];
         }
     *exact = 0;
-    for (int i = 0; i < 3; i++)
+    for (int i = 0; i < nestimated; i++)
         if (km <= estimated[i][0]) return (long)estimated[i][1];
-    return 36;
+    return BMTC_MAX_FARE;
 }
 
 long walk_minutes(double km) { return (long)ceil(km / WALK_KMPH * 60); }

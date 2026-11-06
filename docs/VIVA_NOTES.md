@@ -270,9 +270,11 @@ combination is kept, with time as the tie-break.
     than the riding time (so waiting is counted), that fares match the official table,
     and that the metro is closed at 2 AM.
 32. **What does each fare label mean?** Official: the operator's own table (metro).
-    Govt rate: a state-notified rate (auto, cab). Estimated: derived from older official
-    data (BMTC beyond 6 km = 2020 slab × 1.2, because the verified 2025 stages
-    ₹6/₹12/₹18 are exactly 1.2 × the 2020 stages ₹5/₹10/₹15). Indicative: no official rate exists (bike taxi).
+    Govt rate: a state-notified rate (auto, cab). Estimated: BMTC beyond 6 km. The 5 Nov 2026
+    revision published ₹10/₹18/₹25 for the first three stages, but longer fares only as fares
+    from Majestic to named places (Hebbal ₹30, Jayanagar ₹35, Nelamangala ₹40, Harohalli ₹44,
+    ₹45 maximum), so those slabs are estimated from road distance. Indicative: no official
+    rate exists (bike taxi).
 
 ### Demo script for live mode (2 minutes)
 1. Switch to **Live Bengaluru**, then search *Koramangala → Whitefield*. Point out the

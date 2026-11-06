@@ -105,7 +105,7 @@ Notes:
 ## Architecture
 
 ```
-Browser  web/index.html · styles.css · spatial.css · bento.css · app.js · motion.js · spatial.js · Leaflet map
+Browser  web/index.html · styles.css · system.css · landing.css · effects.css · kinetic.css · app.js · motion.js · effects.js · kinetic.js · Leaflet map
    │  fetch("/api/live/plan?from_lat=…")          fetch("/api/routes?source=…")
    ▼
 C server  backend-c/src/http.c (sockets, threads, gzip) → server.c (security guard, validation,
@@ -192,16 +192,23 @@ score, feel check and screenshot evidence are in `scrollcraft/builds/smart-trave
   the real 251-state metro graph: stations settle one by one, the min-heap and log update, then
   the route lights up in its line colours with the official fare. Tap any station, or use the
   selects, to replay to it. The slider is the same playhead for keyboard users.
-- **Fares**, the rate cards with sources, slide sideways as a curved wall that turns to face
-  you. **System** is a bento grid of real counts read from the backend, beside small animated
-  tiles for the min-heap, Dijkstra/A*/Yen and the C HTTP server. The page ends on a
-  "Where to next?" input.
-- **Spatial UI** (in the style of visionOS): frosted glass windows float in a dark 3D room
-  with lights and a receding floor. The tab bar and controls float as separate pills, and
-  windows lean toward the pointer. The peacock-on-lotus emblem stands on the landing page and
-  is carved faintly into the room.
-- Colours come from the emblem: turmeric yellow (accent), kumkum red and lotus violet.
-  Material Symbols icons, Outfit and Geist type. Respects reduced motion. Works on phones.
+- **Fares**, the rate cards with sources, each led by a photograph of that mode on Bengaluru
+  streets, slide sideways as you scroll. **System** is a grid of tiles with real counts read
+  from the backend, beside small animated tiles for the min-heap, Dijkstra/A*/Yen and the C
+  HTTP server. The page ends on a "Where to next?" input.
+- **Design** in the manner of apple.com: white and pale grey sections, one near-black ink,
+  one blue for actions, the system typeface (SF Pro on Apple devices) set large, and rounded
+  surfaces told apart by tone instead of lines or shadows. The algorithm chapter turns the
+  page dark. The landing (`landing.css`) runs real footage of a Namma Metro train crossing
+  its viaduct, with the live fares for the trip in glass pills over it; the closing question
+  sits over footage of a Bengaluru junction (both by Gpkp, CC BY-SA 4.0, in `web/media/`).
+  The palette is black, white and grey with one blue. `kinetic.js` adds eased wheel
+  scrolling, magnetic buttons, cards that tilt toward the pointer, a ticker and headings
+  driven by scroll speed, and parallax. A short opening draws the route mark, the headline arrives word by word, a
+  rainbow edge glow runs round the map while a trip is compared, and routes draw themselves
+  on the map (`effects.css`, `effects.js`).
+- Photographs come from Wikimedia Commons under CC BY / CC BY-SA, credited in the footer
+  (`web/media/`). Material Symbols icons. Respects reduced motion. Works on phones.
 - The previous frontend is kept in `web_legacy/` for reference.
 
 ## Live mode: what each number means
@@ -212,7 +219,7 @@ score, feel check and screenshot evidence are in `scrollcraft/builds/smart-trave
 | **Auto** (Namma Yatri, meter autos) | Live road route (Ola Maps) | Govt meter rate (Aug 2025): ₹36 for 2 km + ₹18/km, +50% from 10 PM to 5 AM | Govt rate |
 | **Cab** (Uber, Ola) | Live road route | Govt uniform taxi fare (Feb 2025): ₹100 for 4 km + ₹24/km. Apps may add surge or fees | Govt rate |
 | **Bike taxi** (Rapido, Uber Moto) | Live road route | No official rate card, so indicative ₹20 + ₹8/km (edit `backend-c/src/fares.c`) | Indicative |
-| **BMTC bus** | Road time × 1.5 + 8 min average wait (estimate) | ₹6 / ₹12 / ₹18 up to 6 km (Jan 2025). Longer trips are **estimated** as the 2020 slabs × 1.2 (the verified ratio): ≈₹24 up to 14 km, ≈₹30 up to 40 km, ≈₹36 beyond | Official / Estimated |
+| **BMTC bus** | Road time × 1.5 + 8 min average wait (estimate) | ₹10 / ₹18 / ₹25 up to 6 km (5 Nov 2026 revision). Longer trips are **estimated** from the fares BMTC published to named places: ≈₹30 up to 10 km, ≈₹35 up to 14 km, ≈₹38 up to 20 km, ≈₹40 up to 30 km, ≈₹42 up to 38 km, ≈₹44 up to 45 km, ₹45 maximum | Official / Estimated |
 
 Other live behaviour: metro is marked unavailable outside its operating hours (from the
 timetable) or when both places are nearest the same station. Places outside Bengaluru
@@ -234,8 +241,8 @@ browser's location.
 
 ```
 smart-travel-cost-finder/
-├── web/                     # Frontend: index.html, styles.css + spatial.css + bento.css, app.js,
-│                            #   motion.js (scroll engine), spatial.js (depth), brand/ (emblem), vendor/
+├── web/                     # Frontend: index.html, styles.css + system.css, app.js,
+│                            #   motion.js (scroll engine), effects.* (animation), brand/, media/, vendor/
 ├── backend-c/               # THE WEB BACKEND, in C (see "C backend" above)
 │   ├── Makefile
 │   └── src/                 # server, http, routing, metro, planner, olamaps, heap, strmap, cache, ...
@@ -255,9 +262,11 @@ AddressSanitizer. See **C backend** above.
 ## Data sources and credits
 
 - Ola Maps (places, routing with traffic): https://maps.olakrutrim.com
-- Namma Metro GTFS by Vonter, https://github.com/Vonter/bmrcl-gtfs (ODbL 1.0), based on BMRCL timetables and OpenStreetMap
+- Namma Metro GTFS by Vonter, https://github.com/Vonter/bmrcl-gtfs (ODbL 1.0), based on BMRCL timetables and OpenStreetMap.
+  The Pink Line (Kalena Agrahara - Tavarekere, opening 13 Nov 2026) is added by `tools/add_pink_line.py`:
+  stations from OpenStreetMap, fares anchored on the official Jayadeva Hospital fares, timetable estimated
 - Map tiles © OpenStreetMap contributors (Leaflet)
-- Fare rules: Govt. of Karnataka notifications (auto Aug 2025, taxi Feb 2025), BMTC Jan 2025 revision (first stages)
+- Fare rules: Govt. of Karnataka notifications (auto Aug 2025, taxi Feb 2025), BMTC 5 Nov 2026 revision (first stages; longer trips estimated from published route fares)
 
 ## Limitations
 

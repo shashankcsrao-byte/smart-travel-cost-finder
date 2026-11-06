@@ -58,9 +58,8 @@
 
 /* Our own files are linked as app.js?v=<hash of their contents>, so browsers may keep them for a
    year: a new deploy changes the hash and therefore the URL. */
-static const char *const VERSIONED_ASSETS[] = {"styles.css", "spatial.css", "bento.css", "motion.js", "app.js",
-                                               "spatial.js", "vendor/fonts.css", "vendor/leaflet/leaflet.css",
-                                               "vendor/leaflet/leaflet.js"};
+static const char *const VERSIONED_ASSETS[] = {"styles.css", "system.css", "landing.css", "effects.css", "effects.js",
+                                               "kinetic.css", "kinetic.js", "motion.js", "app.js"};
 
 typedef struct {
     Graph *graph;
@@ -622,7 +621,7 @@ static void api_live_status(App *app, Response *res) {
     jw_str(&w, "Places, road distance and live traffic times: Ola Maps");
     jw_str(&w, "Namma Metro stations, timetable and official fares: BMRCL via github.com/Vonter/bmrcl-gtfs (ODbL)");
     jw_str(&w, "Auto and cab fares: Govt. of Karnataka notified rates");
-    jw_str(&w, "BMTC fares: first stages of the Jan 2025 revision, longer trips estimated");
+    jw_str(&w, "BMTC fares: first stages of the 5 Nov 2026 revision, longer trips estimated");
     jw_arr_end(&w);
     jw_obj_end(&w);
     send_json(res, &b);
@@ -836,7 +835,7 @@ static void api_live_fares(App *app, Response *res) {
               auto_ex, AUTO_SOURCE);
     fare_rule(&w, "cab", "Cab", "regulated", "₹100 for the first 4 km, then ₹24 per km", cab_ex, CAB_SOURCE);
     fare_rule(&w, "bus", "BMTC bus", "estimated",
-              "₹6, ₹12, ₹18 up to 6 km. Longer trips estimated (2020 slabs × 1.2)", bus_ex, BMTC_SOURCE);
+              "₹10, ₹18, ₹25 up to 6 km (5 Nov 2026). Longer trips estimated, ₹45 maximum", bus_ex, BMTC_SOURCE);
     fare_rule(&w, "bike_taxi", "Bike taxi", "indicative", "₹20 + ₹8 per km (no official rate card)", bike_ex,
               BIKE_SOURCE);
     jw_arr_end(&w);
@@ -869,6 +868,7 @@ static const char *content_type(const char *path) {
         {".ico", "image/vnd.microsoft.icon"}, {".woff2", "font/woff2"}, {".woff", "font/woff"},
         {".ttf", "font/ttf"}, {".otf", "font/otf"}, {".txt", "text/plain; charset=utf-8"},
         {".md", "text/markdown; charset=utf-8"}, {".xml", "application/xml"},
+        {".mp4", "video/mp4"}, {".webm", "video/webm"},
     };
     for (size_t i = 0; i < sizeof types / sizeof *types; i++)
         if (strcasecmp(dot, types[i][0]) == 0) return types[i][1];
@@ -887,6 +887,35 @@ static void serve_index(App *app, const Request *req, Response *res) {
     res->status = 200;
     buf_puts(&res->body, app->index_html);
     res_header(res, "Content-Type", "text/html; charset=utf-8");
+}
+
+/* One "bytes=first-last" range (Safari asks for these before it plays a video).
+   Returns 1 with *first and *last set, 0 when there is no usable Range header (send it all),
+   -1 when the range lies outside the file. Multi-range requests get the whole file. */
+static int parse_range(const char *h, size_t len, size_t *first, size_t *last) {
+    if (!h || strncmp(h, "bytes=", 6) != 0 || strchr(h, ',') || len == 0) return 0;
+    const char *p = h + 6;
+    char *end;
+    if (*p == '-') {                                   /* "bytes=-500": the last 500 bytes */
+        unsigned long long n = strtoull(p + 1, &end, 10);
+        if (end == p + 1 || *end) return 0;
+        if (n == 0) return -1;
+        *first = n >= len ? 0 : len - (size_t)n;
+        *last = len - 1;
+        return 1;
+    }
+    unsigned long long a = strtoull(p, &end, 10);
+    if (end == p || *end != '-') return 0;
+    p = end + 1;
+    unsigned long long b = len - 1;
+    if (*p) {
+        b = strtoull(p, &end, 10);
+        if (end == p || *end) return 0;
+    }
+    if (a >= len || b < a) return -1;
+    *first = (size_t)a;
+    *last = b >= len ? len - 1 : (size_t)b;
+    return 1;
 }
 
 static void serve_static(App *app, const Request *req, Response *res) {
@@ -929,10 +958,25 @@ static void serve_static(App *app, const Request *req, Response *res) {
         res_detail(res, 404, "Not Found");
         return;
     }
-    res->status = 200;
-    buf_putn(&res->body, data, len);
-    free(data);
     res_header(res, "Content-Type", content_type(full.s));
+    res_header(res, "Accept-Ranges", "bytes");
+    size_t first = 0, last = 0;
+    int ranged = parse_range(req_header(req, "range"), len, &first, &last);
+    char span[96];
+    if (ranged < 0) {
+        snprintf(span, sizeof span, "bytes */%zu", len);
+        res_header(res, "Content-Range", span);
+        res->status = 416;
+    } else if (ranged > 0) {
+        snprintf(span, sizeof span, "bytes %zu-%zu/%zu", first, last, len);
+        res_header(res, "Content-Range", span);
+        res->status = 206;
+        buf_putn(&res->body, data + first, last - first + 1);
+    } else {
+        res->status = 200;
+        buf_putn(&res->body, data, len);
+    }
+    free(data);
     buf_free(&full);
 }
 
@@ -1155,6 +1199,9 @@ headers:
         const char *v = req_param(req, "v");
         if (res->status == 200 && v && strcmp(v, app->version) == 0) res_header(res, "Cache-Control", LONG_CACHE);
         else if (res->status == 200 && strncmp(path, "/vendor/", 8) == 0) res_header(res, "Cache-Control", VENDOR_CACHE);
+        else if ((res->status == 200 || res->status == 206) &&
+                 (strncmp(path, "/media/", 7) == 0 || strncmp(path, "/brand/", 7) == 0))
+            res_header(res, "Cache-Control", VENDOR_CACHE);     /* photos and footage change rarely: a week */
         else res_header(res, "Cache-Control", "no-cache");      /* always revalidate (ETag) */
         res_header_default(res, "Content-Security-Policy", CSP);
     }

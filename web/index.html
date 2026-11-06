@@ -5,43 +5,37 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Smart Travel · cheapest way there</title>
 <meta name="description" content="Compare walk, bus, metro, auto, bike taxi and cab across Bengaluru, ranked by your priority, with routes found by hand-written Dijkstra, A* and a real metro timetable search.">
-<meta name="theme-color" content="#08060A">
-<link rel="icon" type="image/png" sizes="32x32" href="brand/favicon-32.png">
-<link rel="apple-touch-icon" href="brand/apple-touch-icon.png">
-<!-- Everything is served locally: the site works with no internet (except live data and map tiles). -->
-<link rel="stylesheet" href="vendor/fonts.css">
-<link rel="stylesheet" href="vendor/leaflet/leaflet.css">
+<meta name="theme-color" content="#000000">
+<link rel="icon" type="image/svg+xml" href="brand/mark.svg">
+<!-- Everything is served locally: the site works with no internet (except live data and map tiles).
+     Leaflet loads only when the map nears the screen (app.js). -->
+<link rel="preconnect" href="https://tile.openstreetmap.org">
 <link rel="stylesheet" href="styles.css">
-<link rel="stylesheet" href="spatial.css">
-<link rel="stylesheet" href="bento.css">
+<link rel="stylesheet" href="system.css">
+<link rel="stylesheet" href="landing.css">
+<link rel="stylesheet" href="effects.css">
+<link rel="stylesheet" href="kinetic.css">
 </head>
 <body data-mode="live">
 
-<!-- The room the glass windows float in: light, a receding floor and dust (spatial.css). -->
-<div class="room" aria-hidden="true">
-  <div class="room__glow room__glow--a"></div>
-  <div class="room__glow room__glow--b"></div>
-  <div class="room__glow room__glow--c"></div>
-  <div class="room__dust"></div>
-  <img class="room__emblem" src="brand/emblem-640.webp" alt="" width="640" height="640" decoding="async">
-  <div class="room__horizon"></div>
-  <div class="room__floor"><div class="room__grid"></div></div>
-</div>
+
+<!-- Opening: the route mark draws itself, then the white sheet lifts (CSS only, so it always ends). -->
+<div class="intro" aria-hidden="true"><svg class="intro__mark" viewBox="0 0 32 32"><rect width="32" height="32" rx="9"/><path d="M10 22 C10 14 22 18 22 10" pathLength="1"/><circle cx="10" cy="22" r="3.4" class="intro__a"/><circle cx="22" cy="10" r="3.4" class="intro__b"/></svg></div>
 
 <span data-progress></span>
 <a class="skip" href="#plan-from">Skip to the trip planner</a>
 
-<!-- App chrome is the navigation: this page is the tool, not an advert for it. -->
+<!-- A plain bar: wordmark, four links, the data switch. -->
 <header class="appbar" id="appbar">
   <a class="brand" href="#top" aria-label="Smart Travel, back to the planner">
     <svg class="brand__mark" viewBox="0 0 32 32" aria-hidden="true"><rect width="32" height="32" rx="9"/><circle cx="10" cy="22" r="3.4" class="brand__a"/><circle cx="22" cy="10" r="3.4" class="brand__b"/><path d="M10 22 C10 14 22 18 22 10"/></svg>
     <span class="brand__word">Smart Travel</span>
   </a>
   <nav class="tabs" aria-label="Sections">
-    <a href="#top" class="tab is-on" data-tab="top"><i class="ic" data-i="route"></i>Plan</a>
-    <a href="#dijkstra" class="tab" data-tab="dijkstra" id="tab-dijkstra"><i class="ic" data-i="timeline"></i>Dijkstra</a>
-    <a href="#fares" class="tab" data-tab="fares"><i class="ic" data-i="payments"></i>Fares</a>
-    <a href="#system" class="tab" data-tab="system"><i class="ic" data-i="monitoring"></i>System</a>
+    <a href="#plan" class="tab is-on" data-tab="top">Plan</a>
+    <a href="#dijkstra" class="tab" data-tab="dijkstra" id="tab-dijkstra">How it works</a>
+    <a href="#fares" class="tab" data-tab="fares">Fares</a>
+    <a href="#system" class="tab" data-tab="system">System</a>
   </nav>
   <div class="seg" role="radiogroup" aria-label="Data source">
     <button type="button" class="seg__btn" role="radio" aria-checked="true" data-mode="live" tabindex="0"><span class="dot" aria-hidden="true"></span>Live</button>
@@ -51,13 +45,35 @@
 
 <main id="top">
 
+  <!-- 0 · LANDING. Colour, the promise, and the city moving underneath it. -->
+  <section class="stage" id="landing" aria-labelledby="hero-title">
+    <!-- Real footage: a Namma Metro train crossing its viaduct (credited in the footer). -->
+    <div class="stage__media" aria-hidden="true">
+      <video class="stage__video" data-ambient autoplay muted loop playsinline preload="auto" poster="media/hero.jpg">
+        <source src="media/hero-small.mp4" type="video/mp4" media="(max-width: 760px)">
+        <source src="media/hero.mp4" type="video/mp4">
+      </video>
+    </div>
+    <div class="stage__copy">
+      <h1 class="stage__title" id="hero-title" data-words>The cheapest way there.</h1>
+      <p class="rotor" aria-hidden="true">
+        <span style="--n:0">by bus.</span><span style="--n:1">by metro.</span><span style="--n:2">by auto.</span><span style="--n:3">by bike taxi.</span><span style="--n:4">by cab.</span><span style="--n:5">on foot.</span>
+      </p>
+      <p class="stage__sub">Every way across Bengaluru, priced and ranked on live roads.</p>
+      <div class="stage__acts">
+        <a class="btn btn--primary" href="#plan">Plan a trip</a>
+      </div>
+    </div>
+  </section>
+
   <!-- 1 · ANSWER. The planner already holds a computed trip when the page lands. -->
-  <section class="hero" id="plan" aria-labelledby="hero-title">
+  <section class="hero" id="plan" aria-labelledby="plan-title">
+    <div class="hero__head">
+      <h2 class="hero__title" id="plan-title" data-skew data-words data-in data-stagger="70">Plan a trip.</h2>
+      <p class="hero__sub" id="hero-sub">Pick two places. Every option comes back ranked, with where its fare comes from.</p>
+    </div>
     <div class="hero__grid">
       <div class="hero__left">
-        <img class="seal seal--hero" src="brand/emblem-256.webp" alt="" width="116" height="116" decoding="async">
-        <h1 class="hero__title" id="hero-title">The cheapest way there, <span class="hero__accent">already ranked.</span></h1>
-        <p class="hero__sub" id="hero-sub">Walk, bus, metro, auto, bike taxi and cab on live Bengaluru roads.</p>
 
         <form class="planner" id="planner" autocomplete="off" novalidate>
           <div class="field" data-end="from">
@@ -99,7 +115,6 @@
               <p class="results__meta" id="results-meta"></p>
             </div>
             <div class="results__acts">
-              <button type="button" class="icon-btn" id="save-trip" aria-pressed="false" aria-label="Save this trip" title="Save this trip"><i class="ic" data-i="star"></i></button>
               <button type="button" class="icon-btn" id="share-trip" aria-label="Share this trip" title="Share this trip"><i class="ic" data-i="share"></i></button>
             </div>
           </div>
@@ -119,11 +134,16 @@
     </div>
   </section>
 
-  <!-- 2 · PAUSE. Authored silence before the peak: the ground goes dark, one line. -->
-  <section class="hush" id="hush" data-act="flow">
-    <div class="hush__panel" data-reveal="up" data-reveal-at="0 0.45">
-      <p class="hush__line">How did it choose the metro route?</p>
-      <p class="hush__meta"><i class="ic" data-i="timeline"></i><code>dijkstra()</code> on the real Namma Metro timetable, replayed step by step</p>
+  <!-- Ticker: the fare examples from the rate cards, running past in their mode colours. -->
+  <div class="ticker" role="region" aria-label="Fare examples" data-skew>
+    <ul class="ticker__row" id="ticker"><li data-mode="metro">Metro</li><li data-mode="bus">Bus</li><li data-mode="auto">Auto</li><li data-mode="bike_taxi">Bike taxi</li><li data-mode="cab">Cab</li></ul>
+  </div>
+
+  <!-- 2 · CHAPTER. The page turns black: the question, then the line itself from the air. -->
+  <section class="hush" id="hush" data-act="flow" aria-labelledby="hush-title">
+    <div class="hush__head">
+      <h2 class="hush__line" id="hush-title" data-skew data-words data-in data-stagger="70">How did it pick the metro?</h2>
+      <p class="hush__meta" data-words="lit">It runs <code>dijkstra()</code> on the real Namma Metro timetable. Scroll, and watch it replay step by step.</p>
     </div>
   </section>
 
@@ -171,30 +191,28 @@
 
       <div class="scrubber">
         <div class="player" role="group" aria-label="Replay controls">
-          <button type="button" class="icon-btn" id="step-back" aria-label="Previous step"><i class="ic" data-i="skip_previous"></i></button>
           <button type="button" class="icon-btn player__play" id="play" aria-label="Play the run"><i class="ic" data-i="play_arrow" data-fill></i></button>
-          <button type="button" class="icon-btn" id="step-next" aria-label="Next step"><i class="ic" data-i="skip_next"></i></button>
         </div>
         <label for="trace-range" class="sr">Algorithm step</label>
         <input type="range" id="trace-range" min="0" max="1000" step="1" value="0">
-        <span class="scrubber__out" id="trace-out">step 0</span>
+        <span class="scrubber__out" id="trace-out">step 0</span><!-- taste-skill-ignore: live step counter -->
       </div>
     </div>
   </section>
 
   <!-- 4 · TRUST. Every fare rule, with its source, travelling sideways. -->
-  <section class="fares" id="fares" data-act="pan" data-span="4.2">
+  <section class="fares" id="fares" data-act="pan" data-span="2.8" aria-labelledby="fares-title">
     <div data-stage class="fares__stage">
       <div class="rail" data-pan="0.05">
         <div class="rail__lead">
-          <h2 class="rail__title">Every fare shows where it comes from.</h2>
+          <h2 class="rail__title" id="fares-title" data-skew data-words data-in data-stagger="70">Every fare, with its source.</h2>
           <p class="rail__body">Uber, Ola, Rapido and Namma Yatri do not share live prices with other apps, so each number is labelled honestly and each result links to the real app.</p>
         </div>
-        <article class="rate" data-mode="metro"><i class="ic rate__icon" data-i="subway"></i><h3>Metro</h3><p class="rate__kind"></p><p class="rate__rule"></p><p class="rate__ex"></p><p class="rate__src"></p></article>
-        <article class="rate" data-mode="bus"><i class="ic rate__icon" data-i="directions_bus"></i><h3>Bus</h3><p class="rate__kind"></p><p class="rate__rule"></p><p class="rate__ex"></p><p class="rate__src"></p></article>
-        <article class="rate" data-mode="auto"><i class="ic rate__icon" data-i="electric_rickshaw"></i><h3>Auto</h3><p class="rate__kind"></p><p class="rate__rule"></p><p class="rate__ex"></p><p class="rate__src"></p></article>
-        <article class="rate" data-mode="bike_taxi"><i class="ic rate__icon" data-i="two_wheeler"></i><h3>Bike</h3><p class="rate__kind"></p><p class="rate__rule"></p><p class="rate__ex"></p><p class="rate__src"></p></article>
-        <article class="rate" data-mode="cab"><i class="ic rate__icon" data-i="local_taxi"></i><h3>Cab</h3><p class="rate__kind"></p><p class="rate__rule"></p><p class="rate__ex"></p><p class="rate__src"></p></article>
+        <article class="rate" data-mode="metro"><img class="rate__img" src="media/metro-station.jpg" alt="Sitharamapalya station on the Purple Line" width="1000" height="667" loading="lazy" decoding="async"><h3>Metro</h3><p class="rate__kind"></p><p class="rate__rule"></p><p class="rate__ex"></p><p class="rate__src"></p></article>
+        <article class="rate" data-mode="bus"><img class="rate__img" src="media/bus.jpg" alt="A red BMTC Volvo on route 335E" width="1000" height="667" loading="lazy" decoding="async"><h3>Bus</h3><p class="rate__kind"></p><p class="rate__rule"></p><p class="rate__ex"></p><p class="rate__src"></p></article>
+        <article class="rate" data-mode="auto"><img class="rate__img" src="media/auto.jpg" alt="A Namma Yatri sign on an auto-rickshaw roof in Bengaluru" width="1000" height="667" loading="lazy" decoding="async"><h3>Auto</h3><p class="rate__kind"></p><p class="rate__rule"></p><p class="rate__ex"></p><p class="rate__src"></p></article>
+        <article class="rate" data-mode="bike_taxi"><img class="rate__img" src="media/bike.jpg" alt="Motorcycle taxi riders waiting for fares" width="1000" height="667" loading="lazy" decoding="async"><h3>Bike</h3><p class="rate__kind"></p><p class="rate__rule"></p><p class="rate__ex"></p><p class="rate__src"></p></article>
+        <article class="rate" data-mode="cab"><img class="rate__img" src="media/cab.jpg" alt="Cars, autos and scooters at a Bengaluru junction" width="1000" height="667" loading="lazy" decoding="async"><h3>Cab</h3><p class="rate__kind"></p><p class="rate__rule"></p><p class="rate__ex"></p><p class="rate__src"></p></article>
         <div class="rail__note">
           <i class="ic" data-i="open_in_new"></i>
           <p>For the exact price right now, open a result above and tap the app button.</p>
@@ -207,11 +225,13 @@
        data structures behind it, each tile with a small working picture of itself. -->
   <section class="system" id="system" data-act="flow" aria-labelledby="sys-title">
     <div class="system__wrap">
-      <h2 class="system__title" id="sys-title"><i class="ic" data-i="monitoring"></i>System status</h2>
-      <p class="system__lede">Live numbers read from the running C backend, beside the parts that produce them.</p>
+      <div class="system__head" data-speed="0.1">
+        <h2 class="system__title" id="sys-title" data-skew data-words data-in data-stagger="70">Built from scratch, in C.</h2>
+        <p class="system__lede">Live numbers from the running backend, beside the parts that produce them.</p>
+      </div>
       <dl class="bento" id="bento">
         <div class="tile tile--hero" style="--area: st">
-          <dt><i class="ic" data-i="subway"></i>Metro stations in the graph</dt>
+          <dt>Metro stations in the graph</dt>
           <dd><span id="tc-stations" class="nums" data-count>0</span></dd>
           <dd class="tile__art" aria-hidden="true"><svg class="tile__metro" viewBox="0 0 240 120">
             <path class="tm-line tm-line--a" pathLength="100" d="M10 100 C70 100 80 20 140 20 S220 40 230 40"/>
@@ -223,17 +243,17 @@
           </svg></dd>
         </div>
         <div class="tile tile--feature" style="--area: heap">
-          <dt><i class="ic" data-i="timeline"></i>Binary min-heap</dt>
+          <dt>Binary min-heap</dt>
           <dd class="tile__text">Dijkstra always takes the cheapest place next. <code>heap.c</code> pops it in O(log n).</dd>
           <dd class="tile__art" aria-hidden="true"><ol class="heapviz"><li style="--h:22"></li><li style="--h:38"></li><li style="--h:31"></li><li style="--h:64"></li><li style="--h:50"></li><li style="--h:82"></li><li style="--h:71"></li><li style="--h:95"></li></ol></dd>
         </div>
-        <div class="tile" style="--area: ln"><dt><i class="ic" data-i="route"></i>Metro lines</dt><dd><span id="tc-lines" class="nums" data-count>0</span></dd></div>
-        <div class="tile" style="--area: gs"><dt><i class="ic" data-i="alt_route"></i>Graph states</dt><dd><span id="tc-states" class="nums" data-count>0</span></dd></div>
-        <div class="tile tile--speed" style="--area: ms"><dt><i class="ic" data-i="bolt"></i>Last comparison took</dt><dd><span id="tc-ms">n/a</span></dd><dd class="tile__art" aria-hidden="true"><span class="tile__beam"></span></dd></div>
-        <div class="tile" style="--area: dl"><dt><i class="ic" data-i="pin_drop"></i>Demo locations</dt><dd><span id="tc-demo" class="nums" data-count>0</span></dd></div>
-        <div class="tile" style="--area: dc"><dt><i class="ic" data-i="link"></i>Demo connections</dt><dd><span id="tc-conn" class="nums" data-count>0</span></dd></div>
+        <div class="tile" style="--area: ln"><dt>Metro lines</dt><dd><span id="tc-lines" class="nums" data-count>0</span></dd></div>
+        <div class="tile" style="--area: gs"><dt>Graph states</dt><dd><span id="tc-states" class="nums" data-count>0</span></dd></div>
+        <div class="tile tile--speed tile--c" style="--area: ms; --tc: #0A84FF"><dt>Last comparison took</dt><dd><span id="tc-ms">n/a</span></dd><dd class="tile__art" aria-hidden="true"><span class="tile__beam"></span></dd></div>
+        <div class="tile" style="--area: dl"><dt>Demo locations</dt><dd><span id="tc-demo" class="nums" data-count>0</span></dd></div>
+        <div class="tile" style="--area: dc"><dt>Demo connections</dt><dd><span id="tc-conn" class="nums" data-count>0</span></dd></div>
         <div class="tile tile--feature" style="--area: algo">
-          <dt><i class="ic" data-i="route"></i>Dijkstra, A* and Yen</dt>
+          <dt>Dijkstra, A* and Yen</dt>
           <dd class="tile__text">One search in <code>routing.c</code> finds the best path; Yen's algorithm finds the next best ones.</dd>
           <dd class="tile__art" aria-hidden="true"><svg class="pathviz" viewBox="0 0 260 120">
             <g class="pv-edges"><path d="M20 60 L80 20 L150 30 L240 60 M20 60 L70 100 L150 90 L240 60 M80 20 L70 100 M150 30 L150 90 M80 20 L150 90"/></g>
@@ -241,10 +261,10 @@
             <g class="pv-nodes"><circle cx="20" cy="60" r="7"/><circle cx="80" cy="20" r="6"/><circle cx="150" cy="30" r="6"/><circle cx="70" cy="100" r="6"/><circle cx="150" cy="90" r="6"/><circle cx="240" cy="60" r="7"/></g>
           </svg></dd>
         </div>
-        <div class="tile tile--wide" style="--area: map"><dt><i class="ic" data-i="verified"></i>Road data</dt><dd id="tc-maps">checking</dd></div>
-        <div class="tile tile--wide" style="--area: feed"><dt><i class="ic" data-i="schedule"></i>Metro timetable valid for</dt><dd><span id="tc-feed">n/a</span></dd></div>
-        <div class="tile" style="--area: calls"><dt><i class="ic" data-i="near_me"></i>Map calls today</dt><dd><span id="tc-calls" class="nums">n/a</span></dd></div>
-        <div class="tile tile--srv" style="--area: srv"><dt><i class="ic" data-i="monitoring"></i>Own HTTP server</dt><dd class="tile__text"><code>http.c</code>: sockets, keep-alive, gzip</dd><dd class="tile__art" aria-hidden="true"><span class="tile__pulse"></span></dd></div>
+        <div class="tile tile--wide" style="--area: map"><dt>Road data</dt><dd id="tc-maps">checking</dd></div>
+        <div class="tile tile--wide" style="--area: feed"><dt>Metro timetable valid for</dt><dd><span id="tc-feed">n/a</span></dd></div>
+        <div class="tile" style="--area: calls"><dt>Map calls today</dt><dd><span id="tc-calls" class="nums">n/a</span></dd></div>
+        <div class="tile tile--srv" style="--area: srv"><dt>Own HTTP server</dt><dd class="tile__text"><code>http.c</code>: sockets, keep-alive, gzip</dd><dd class="tile__art" aria-hidden="true"><span class="tile__pulse"></span></dd></div>
       </dl>
       <p class="system__warn" id="tc-warn" hidden></p>
     </div>
@@ -253,8 +273,13 @@
   <!-- 6 · AGAIN. The page ends on an actual input, not a button. -->
   <section class="again" id="again" data-act="pin" data-span="1.2">
     <div data-stage class="again__stage">
+      <div class="again__media" aria-hidden="true">
+        <video class="again__video" data-ambient muted loop playsinline preload="none" poster="media/city.jpg">
+          <source src="media/city.mp4" type="video/mp4">
+        </video>
+      </div>
       <div class="again__inner">
-        <label class="again__q" for="again-input">Where to next?</label>
+        <label class="again__q" for="again-input" data-skew data-words data-in data-stagger="70">Where to next?</label>
         <div class="again__field field">
           <i class="ic field__icon field__icon--to" data-i="search"></i>
           <input class="field__input" id="again-input" type="text" placeholder="Type a place" role="combobox"
@@ -265,7 +290,16 @@
       </div>
       <footer class="foot">
         <p>Smart Travel Cost Finder · college DSA project · C11 with its own HTTP server, SQLite, hand-written Dijkstra, A* and Yen's algorithm.</p>
-        <p>Road times: Ola Maps. Metro: BMRCL via Namma Metro GTFS (ODbL). Map tiles © OpenStreetMap contributors. Icons: Material Symbols (Apache 2.0). Fonts: Outfit, Geist (OFL). Fares are official, Govt-notified, estimated or indicative, as labelled.</p>
+        <p>Road times: Ola Maps. Metro: BMRCL via Namma Metro GTFS (ODbL). Map tiles © OpenStreetMap contributors. Icons: Material Symbols (Apache 2.0). Type: the system font, Geist (OFL) elsewhere. Fares are official, Govt-notified, estimated or indicative, as labelled.</p>
+        <p class="foot__credits">Video by Gpkp via Wikimedia Commons, slowed, trimmed and re-encoded, CC BY-SA 4.0:
+          <a href="https://commons.wikimedia.org/wiki/File:Namma_metro_transit_(2024)_01.webm">Namma metro transit (2024) 01</a> ·
+          <a href="https://commons.wikimedia.org/wiki/File:Banashankari_traffic_circle,_Banashankari,_Bangalore_(2024)_02.ogg">Banashankari traffic circle (2024) 02</a>.</p>
+        <p class="foot__credits">Photographs via Wikimedia Commons:
+          <a href="https://commons.wikimedia.org/wiki/File:Sitharamapalya_metro_station_(as_of_Jun_%2722).jpg">Sitharamapalya station</a>, Santosh4118, CC BY-SA 4.0 ·
+          <a href="https://commons.wikimedia.org/w/index.php?curid=35626855">BMTC bus</a>, Ramesh NG, CC BY-SA 2.0 ·
+          <a href="https://commons.wikimedia.org/w/index.php?curid=186627298">Namma Yatri auto</a>, Gpkp, CC BY-SA 4.0 ·
+          <a href="https://commons.wikimedia.org/w/index.php?curid=7640148">motorcycle taxis, Goa</a>, Aaron C, CC BY-SA 3.0 ·
+          <a href="https://commons.wikimedia.org/w/index.php?curid=6865924">Bangalore traffic</a>, Eirik Refsdal, CC BY 2.0.</p>
       </footer>
     </div>
   </section>
@@ -274,9 +308,9 @@
 
 <div class="snack" id="snack" role="status" aria-live="polite"></div>
 
-<script src="vendor/leaflet/leaflet.js"></script>
+<script src="effects.js"></script>
 <script src="motion.js"></script>
 <script src="app.js"></script>
-<script src="spatial.js"></script>
+<script src="kinetic.js"></script>
 </body>
 </html>

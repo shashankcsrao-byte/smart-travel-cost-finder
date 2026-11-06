@@ -45,6 +45,7 @@ int is_night(int hour);
 long auto_fare(double km, int hour, int *night);
 long cab_fare(double km);
 long bike_fare(double km);
+#define BMTC_MAX_FARE 45L                   /* ordinary-bus maximum, 5 Nov 2026 revision */
 long bmtc_fare(double km, int *exact);           /* exact = 0 means estimated (over 6 km) */
 long walk_minutes(double km);
 

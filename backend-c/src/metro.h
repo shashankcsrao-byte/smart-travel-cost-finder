@@ -152,6 +152,9 @@ MetroJourney *metro_journey(const MetroNetwork *m, int o, int d, time_t depart, 
 MetroJourney *metro_route(const MetroNetwork *m, int o, int d);
 void metro_journey_free(MetroJourney *j);
 int metro_next_departure(const MetroNetwork *m, int station, time_t depart, char out[8]);   /* 0 if none */
+/* 1 and the date (YYYYMMDD) a station's first service starts, when no service there has started
+   by `when` (a line not open yet); 0 when something already runs there. */
+int metro_opens_after(const MetroNetwork *m, int station, time_t when, char out[16]);
 
 void metro_clock(double seconds, char out[8]);                   /* "HH:MM" */
 void metro_write_station(const MetroNetwork *m, JW *w, int s);

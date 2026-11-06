@@ -36,12 +36,14 @@ static atomic_int open_connections;
 const char *http_reason(int status) {
     switch (status) {
     case 200: return "OK";
+    case 206: return "Partial Content";
     case 304: return "Not Modified";
     case 400: return "Bad Request";
     case 403: return "Forbidden";
     case 404: return "Not Found";
     case 405: return "Method Not Allowed";
     case 413: return "Payload Too Large";
+    case 416: return "Range Not Satisfiable";
     case 422: return "Unprocessable Entity";
     case 429: return "Too Many Requests";
     case 431: return "Request Header Fields Too Large";

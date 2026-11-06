@@ -964,6 +964,26 @@ void metro_journey_free(MetroJourney *j) {
     free(j);
 }
 
+int metro_opens_after(const MetroNetwork *m, int station, time_t when, char out[16]) {
+    Clock c;
+    ist_clock(when, &c);
+    char today[16];
+    snprintf(today, sizeof today, "%04d%02d%02d", c.year, c.month, c.day);
+    const char *first = NULL;
+    for (int i = 0; i < m->ncalendar; i++) {
+        const CalRow *row = &m->calendar[i];
+        int serves = 0;
+        for (int l = 0; l < m->nlines && !serves; l++)
+            for (int dir = 0; dir < 2 && !serves; dir++) serves = deplist(m, row->service, l, dir, station)->n > 0;
+        if (!serves) continue;
+        if (strcmp(row->start, today) <= 0) return 0;         /* a service here has already started */
+        if (!first || strcmp(row->start, first) < 0) first = row->start;
+    }
+    if (!first) return 0;
+    snprintf(out, 16, "%s", first);
+    return 1;
+}
+
 int metro_next_departure(const MetroNetwork *m, int station, time_t depart, char out[8]) {
     Clock c;
     ist_clock(depart, &c);

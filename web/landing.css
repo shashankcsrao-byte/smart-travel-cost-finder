@@ -1,0 +1,115 @@
+/* ==========================================================================
+   Smart Travel · the landing
+   Real footage under the first screen: a Namma Metro train crossing its
+   viaduct, graded dark so white type sits on it. The headline arrives word by
+   word and a quiet line cycles through the ways to travel. The palette is black, white and
+   grey with one blue for actions; colour comes from the footage itself.
+   Further down: the fare ticker in large type and the closing question over
+   a real Bengaluru junction. effects.js plays the footage only while it is on
+   screen and splits headings into words.
+   ========================================================================== */
+
+/* ---------------------------------------------------------- the stage -- */
+.stage {
+  position: relative; isolation: isolate; overflow: clip; background: #000;
+  min-height: 100vh; min-height: 100svh;
+  display: grid; align-content: center; justify-items: center;
+  padding: calc(var(--appbar-h) + 24px) var(--gutter) 96px;
+  text-align: center;
+}
+.stage__copy { position: relative; z-index: 2; }
+
+/* the footage: fills the screen, settles slowly into place, graded dark */
+.stage__media { position: absolute; inset: 0; z-index: 0; overflow: hidden; }
+.stage__video { width: 100%; height: 100%; object-fit: cover; filter: saturate(0.85) contrast(1.06) brightness(0.78);
+  animation: settle 16s cubic-bezier(0.22, 1, 0.36, 1) both; }
+@keyframes settle { from { transform: scale(1.14); } to { transform: scale(1.02); } }
+.stage__media::after { content: ""; position: absolute; inset: 0;
+  background:
+    linear-gradient(180deg, rgba(0, 0, 0, 0.72) 0%, rgba(0, 0, 0, 0.28) 34%, rgba(0, 0, 0, 0.42) 66%, #000 100%),
+    radial-gradient(120% 80% at 50% 45%, transparent 40%, rgba(0, 0, 0, 0.55) 100%); }   /* scrim under type */
+
+.stage__copy { display: grid; justify-items: center; }
+.stage__title {
+  margin: 0; font-weight: 700; font-size: var(--t-hero); line-height: 1.02; letter-spacing: -0.045em; text-wrap: balance;
+  color: #fff; text-shadow: 0 2px 30px rgba(0, 0, 0, 0.35);
+}
+@media (prefers-reduced-motion: no-preference) {
+  .stage__title .w { animation: word-in 1100ms var(--ease-out) forwards; animation-delay: calc(var(--arrive) + var(--i) * 110ms); }
+}
+
+/* by bus. by metro. by auto. … one at a time */
+.rotor { display: grid; margin: 10px 0 0; height: 1.25em; overflow: hidden;
+  font-size: clamp(1.6rem, 1.1rem + 2vw, 2.75rem); font-weight: 600; letter-spacing: -0.035em; line-height: 1.2; color: rgba(255, 255, 255, 0.72); }
+.rotor span { grid-area: 1 / 1; opacity: 0; transform: translateY(80%);
+  animation: rotor 12s var(--ease-out) infinite; animation-delay: calc(var(--arrive) + 400ms + var(--n) * 2s); }
+@keyframes rotor {
+  0% { opacity: 0; transform: translateY(80%); }
+  3%, 14% { opacity: 1; transform: none; }
+  17%, 100% { opacity: 0; transform: translateY(-80%); }
+}
+.stage__sub { margin: 18px 0 0; font-size: var(--t-sub); font-weight: 500; line-height: 1.3; max-width: 32ch; text-wrap: balance; color: rgba(255, 255, 255, 0.86); }
+.stage__acts { display: flex; flex-wrap: wrap; justify-content: center; align-items: center; gap: 14px 24px; margin-top: 30px; }
+.btn {
+  display: inline-flex; align-items: center; gap: 6px; min-height: 50px; padding: 13px 28px; border-radius: 999px;
+  font-size: 1.0625rem; font-weight: 500; text-decoration: none;
+  transition: background-color 200ms var(--ease), transform 160ms var(--ease);
+}
+.btn:active { transform: scale(0.96); }
+.btn--primary { position: relative; overflow: hidden; background: var(--accent); color: #fff; }
+.btn--primary:hover { background: var(--accent-hover); }
+.btn--primary::after {
+  content: ""; position: absolute; inset: 0; pointer-events: none;
+  background: linear-gradient(110deg, transparent 35%, rgba(255, 255, 255, 0.35) 50%, transparent 65%);
+  transform: translateX(-120%); animation: btn-sheen 5s var(--ease-out) calc(var(--arrive) + 2s) infinite;
+}
+@keyframes btn-sheen { 0%, 80% { transform: translateX(-120%); } 100% { transform: translateX(120%); } }
+.btn--plain { color: #fff; padding-inline: 4px; }
+.btn--plain:hover { text-decoration: underline; }
+.stage__sub, .stage__acts { animation: rise-in 1000ms var(--ease-out) both; }
+.stage__sub { animation-delay: calc(var(--arrive) + 500ms); }
+.stage__acts { animation-delay: calc(var(--arrive) + 620ms); }
+
+/* scrolling away: the footage pushes in and darkens as the planner arrives */
+@supports (animation-timeline: view()) {
+  @media (prefers-reduced-motion: no-preference) {
+    .stage__copy { animation: stage-out linear both; animation-timeline: view(); animation-range: exit 0% exit 80%; }
+    .stage__media { animation: media-out linear both; animation-timeline: view(); animation-range: exit 0% exit 100%; }
+  }
+}
+@keyframes stage-out { to { opacity: 0; transform: translateY(-70px) scale(0.94); } }
+@keyframes media-out { to { transform: scale(1.1); opacity: 0.35; } }
+
+/* --------------------------------------------------- the ticker, large -- */
+.ticker { overflow: hidden; padding: clamp(56px, 10vh, 112px) 0; background: var(--bg); }
+.ticker__row { list-style: none; margin: 0; padding: 0; display: flex; align-items: center; width: max-content;
+  animation: tick 40s linear infinite; }
+.ticker:hover .ticker__row { animation-play-state: paused; }
+.ticker__row li {
+  display: inline-flex; align-items: baseline; gap: 18px; white-space: nowrap;
+  font-size: clamp(2.25rem, 1.3rem + 3.8vw, 5rem); font-weight: 700; letter-spacing: -0.045em; line-height: 1.1; color: var(--ink);
+}
+.ticker__row li b { font-weight: 700; color: var(--ink-3); }
+.ticker__row li::after { content: "·"; margin: 0 0.45em; color: #3A3A3C; }
+@keyframes tick { to { transform: translateX(-50%); } }
+
+/* ------------------------------------------- the closing question, live -- */
+.again__stage { position: relative; isolation: isolate; overflow: clip; }
+.again__media { position: absolute; inset: 0; z-index: -1; }
+.again__video { width: 100%; height: 100%; object-fit: cover; filter: saturate(0.7) brightness(0.55); }
+.again__media::after { content: ""; position: absolute; inset: 0;
+  background: linear-gradient(180deg, var(--bg-alt) 0%, rgba(0, 0, 0, 0.45) 30%, rgba(0, 0, 0, 0.6) 70%, #000 100%); }   /* scrim under type */
+.again__q { color: #fff; }
+
+/* ------------------------------------------------------------ responsive -- */
+@media (max-width: 760px) {
+  .stage { padding-bottom: 80px; }
+}
+
+/* --------------------------------------------------------- reduced motion -- */
+@media (prefers-reduced-motion: reduce) {
+  .rotor span { animation: none; }
+  .rotor span:first-child { opacity: 1; transform: none; }
+  .stage__video, .stage__sub, .stage__acts, .btn--primary::after { animation: none !important; }
+  .ticker__row { animation: none; flex-wrap: wrap; width: auto; justify-content: center; padding-inline: var(--gutter); }
+}

@@ -1,0 +1,178 @@
+/* ==========================================================================
+   Smart Travel · effects
+   The motion layer on top of styles.css:
+     the opening (the route mark draws itself, then the white sheet lifts),
+     the hero arriving word by word out of a blur,
+     a blue edge glow around the map while a comparison runs,
+       with ghost rows sweeping in the results,
+     routes drawing themselves on the map, dashed ones marching, pins dropping,
+     headings rising word by word, and the dark chapter lighting word by word.
+   effects.js splits [data-words] into <span class="w" style="--i:n">.
+   Everything here ends visible on its own, and reduced motion turns it off.
+   ========================================================================== */
+
+@property --glow { syntax: "<angle>"; initial-value: 0deg; inherits: false; }
+
+:root {
+  --spring: cubic-bezier(0.34, 1.56, 0.64, 1);
+  --intro-out: 420ms;           /* when the sheet starts to lift: kept short, the page is ready */
+  --intro-lift: 460ms;
+  --arrive: 480ms;              /* when the page's own entrances begin */
+  --rainbow: #0A84FF, #64B5FF, #FFFFFF, #64B5FF, #0A84FF;
+}
+
+/* ---------------------------------------------------------- the opening -- */
+.intro {
+  position: fixed; inset: 0; z-index: 200; display: grid; place-items: center;
+  background: var(--bg); pointer-events: none; clip-path: inset(0 0 0 0);
+  animation: intro-lift var(--intro-lift) cubic-bezier(0.76, 0, 0.24, 1) var(--intro-out) forwards;
+}
+.intro__mark { width: 76px; height: 76px; overflow: visible; animation: mark-out 520ms var(--ease-out) calc(var(--intro-out) - 60ms) forwards; }
+.intro__mark rect { fill: var(--accent); transform-origin: center; animation: mark-in 320ms var(--spring) both; }
+.intro__mark path { fill: none; stroke: #fff; stroke-width: 2.4; stroke-linecap: round;
+  stroke-dasharray: 1; stroke-dashoffset: 1; animation: stroke-on 340ms var(--ease-out) 40ms forwards; }
+.intro__mark circle { transform-box: fill-box; transform-origin: center; transform: scale(0); }
+.intro__a { fill: #fff; animation: dot-pop 300ms var(--spring) 20ms forwards; }
+.intro__b { fill: var(--d-accent); animation: dot-pop 300ms var(--spring) 300ms forwards; }
+@keyframes intro-lift { to { clip-path: inset(0 0 100% 0); visibility: hidden; } }
+@keyframes mark-in { from { transform: scale(0.6); opacity: 0; } }
+@keyframes mark-out { to { transform: translateY(-40px) scale(0.8); opacity: 0; } }
+@keyframes stroke-on { to { stroke-dashoffset: 0; } }
+@keyframes dot-pop { to { transform: scale(1); } }
+
+/* --------------------------------------------------------- hero arrival -- */
+/* the landing headline: words start blurred and low; landing.css runs them in */
+.stage__title .w { display: inline-block; opacity: 0; filter: blur(16px); transform: translateY(0.32em) scale(0.94); }
+@keyframes word-in { to { opacity: 1; filter: blur(0); transform: none; } }
+@keyframes rise-in { from { opacity: 0; transform: translateY(28px); } }
+@keyframes map-in { from { opacity: 0; transform: translateY(48px) scale(0.94); } }
+/* the planner rises into place as it scrolls up under the landing */
+@supports (animation-timeline: view()) {
+  @media (prefers-reduced-motion: no-preference) {
+    .hero__sub, .planner, .controls, .chips, .results__head { animation: rise-in linear both; animation-timeline: view(); animation-range: entry 0% entry 60%; }
+    .mapcard { animation: map-in linear both; animation-timeline: view(); animation-range: entry 0% entry 50%; }
+  }
+}
+
+/* ------------------------------------------- comparing: the edge glow -- */
+.mapcard::before, .mapcard::after {
+  content: ""; position: absolute; inset: 0; z-index: 700; pointer-events: none; border-radius: inherit;
+  background: conic-gradient(from var(--glow), var(--rainbow));
+  opacity: 0; transition: opacity 600ms var(--ease);
+  animation: glow-spin 3.2s linear infinite;
+}
+.mapcard::before {                                   /* the sharp ring */
+  padding: 3px;
+  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor;
+  mask: linear-gradient(#000 0 0) content-box exclude, linear-gradient(#000 0 0);
+}
+.mapcard::after {                                    /* the light it throws inward */
+  -webkit-mask: linear-gradient(to right, #000, transparent 56px, transparent calc(100% - 56px), #000),
+                linear-gradient(to bottom, #000, transparent 56px, transparent calc(100% - 56px), #000);
+  mask: linear-gradient(to right, #000, transparent 56px, transparent calc(100% - 56px), #000),
+        linear-gradient(to bottom, #000, transparent 56px, transparent calc(100% - 56px), #000);
+}
+body:has(#opts[aria-busy="true"]) .mapcard::before { opacity: 1; }
+body:has(#opts[aria-busy="true"]) .mapcard::after { opacity: 0.55; }
+@keyframes glow-spin { to { --glow: 360deg; } }
+
+/* "Comparing…" shimmers while it works */
+.results:has(#opts[aria-busy="true"]) .results__title {
+  background: linear-gradient(100deg, var(--ink) 30%, var(--ink-3) 50%, var(--ink) 70%) 0 0 / 250% 100%;
+  -webkit-background-clip: text; background-clip: text; color: transparent;
+  animation: text-sweep 1.4s linear infinite;
+}
+@keyframes text-sweep { from { background-position: 100% 0; } to { background-position: -150% 0; } }
+
+/* ghost rows: an icon and two lines of text, with light passing over them */
+.skel { animation: rise-in 600ms var(--ease-out) both; }
+.skel:nth-child(2) { animation-delay: 80ms; }
+.skel:nth-child(3) { animation-delay: 160ms; }
+.skel:nth-child(4) { animation-delay: 240ms; }
+.skel::before {
+  content: ""; position: absolute; inset: 14px 18px 14px 14px;
+  background:
+    linear-gradient(var(--fill) 0 0) 0 0 / 48px 48px no-repeat,
+    linear-gradient(var(--fill) 0 0) 62px 8px / 36% 14px no-repeat,
+    linear-gradient(var(--fill) 0 0) 62px 32px / 22% 10px no-repeat,
+    linear-gradient(var(--fill) 0 0) 100% 11px / 72px 26px no-repeat;
+}
+.skel::after {
+  background: linear-gradient(100deg, transparent 25%, rgba(255, 255, 255, 0.09) 50%, transparent 75%);
+  animation: shimmer 1.3s var(--ease) infinite;
+}
+.skel:nth-child(2)::after { animation-delay: 120ms; }
+.skel:nth-child(3)::after { animation-delay: 240ms; }
+.skel:nth-child(4)::after { animation-delay: 360ms; }
+
+/* the chosen option's icon pops when picked */
+.opt.is-sel .opt__icon { animation: icon-pop 520ms var(--spring); }
+@keyframes icon-pop { 40% { transform: scale(1.14) rotate(-6deg); } }
+
+/* ------------------------------------------------------ routes on the map -- */
+.leaflet-overlay-pane path.route-draw {
+  stroke-dasharray: 6000; stroke-dashoffset: 6000;
+  animation: route-draw 1600ms var(--ease-out) 120ms forwards;
+}
+@keyframes route-draw { to { stroke-dashoffset: 0; } }
+.leaflet-overlay-pane path.route-march { animation: march 1.8s linear infinite; }
+@keyframes march { to { stroke-dashoffset: -42; } }           /* 42 = both dash cycles, 21 and 14 */
+.pin { position: relative; animation: pin-drop 700ms var(--spring) 200ms both; }
+.pin--b { animation-delay: 700ms; }
+.pin--b::after { content: ""; position: absolute; inset: -6px; border-radius: 50%; border: 2px solid var(--red); animation: pulse 1.8s var(--ease) 1.4s infinite; opacity: 0; }
+@keyframes pin-drop { from { opacity: 0; transform: translateY(-36px) scale(0.5); } }
+
+/* ------------------------------------------------- headings, word by word -- */
+.js [data-words][data-in] > .w {
+  display: inline-block; filter: blur(10px); transform: translateY(0.45em);
+  transition: opacity 900ms var(--ease-out), transform 900ms var(--ease-out), filter 900ms var(--ease-out);
+}
+.js [data-words][data-in].is-in > .w { opacity: 1; filter: blur(0); transform: none; }
+
+/* the dark chapter's sentence lights up one word at a time as it scrolls past */
+@supports (animation-timeline: view()) {
+  @media (prefers-reduced-motion: no-preference) {
+    [data-words="lit"] .w {
+      color: #86868B; animation: lit linear both; animation-timeline: view();
+      animation-range: cover calc(12% + var(--i) * 1.8%) cover calc(18% + var(--i) * 1.8%);
+    }
+    [data-words="lit"] code { color: inherit; }
+  }
+}
+@keyframes lit { to { color: var(--d-ink); } }
+
+/* fare cards: the words follow the photograph in */
+.rate > :not(.rate__img) { opacity: 0; transform: translateY(18px); transition: opacity 700ms var(--ease-out), transform 700ms var(--ease-out); }
+.rate.is-in > :not(.rate__img) { opacity: 1; transform: none; }
+.rate.is-in > :nth-child(3) { transition-delay: 80ms; }
+.rate.is-in > :nth-child(4) { transition-delay: 140ms; }
+.rate.is-in > :nth-child(5) { transition-delay: 200ms; }
+.rate.is-in > :nth-child(6) { transition-delay: 260ms; }
+
+/* the closing search box's suggestions fade between names */
+.field__input::placeholder { transition: opacity 240ms var(--ease); }
+.field__input.ph-out::placeholder { opacity: 0; }
+
+/* primary buttons catch a sheen on hover */
+.app--primary { overflow: hidden; }
+.app--primary::after {
+  content: ""; position: absolute; inset: 0; pointer-events: none;
+  background: linear-gradient(110deg, transparent 35%, rgba(255, 255, 255, 0.45) 50%, transparent 65%);
+  transform: translateX(-120%);
+}
+@media (hover: hover) and (pointer: fine) { .app--primary:hover::after { transition: transform 700ms var(--ease-out); transform: translateX(120%); } }
+
+/* --------------------------------------------------------- reduced motion -- */
+@media (prefers-reduced-motion: reduce) {
+  .intro { display: none; }
+  .stage__title .w, .hero__sub, .planner, .controls, .chips, .results__head, .mapcard,
+  .skel, .opt.is-sel .opt__icon, .pin, .pin--b::after,
+  .leaflet-overlay-pane path.route-draw, .leaflet-overlay-pane path.route-march { animation: none !important; }
+  .stage__title .w { opacity: 1; filter: none; transform: none; }
+  .leaflet-overlay-pane path.route-draw { stroke-dasharray: none; stroke-dashoffset: 0; }
+  .mapcard::before, .mapcard::after { animation: none; }
+  .js [data-words][data-in] > .w { filter: none; transform: none; }
+  .rate > :not(.rate__img) { opacity: 1; transform: none; transition: none; }
+  .results:has(#opts[aria-busy="true"]) .results__title { animation: none; color: var(--ink); background: none; }
+}

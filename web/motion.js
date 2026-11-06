@@ -18,6 +18,9 @@
 (function () {
   "use strict";
 
+  // Entrance groups ([data-in]) are only hidden once this script is known to run.
+  document.documentElement.classList.add("js");
+
   const clamp01 = (x) => (x < 0 ? 0 : x > 1 ? 1 : x);
 
   function mount(root) {

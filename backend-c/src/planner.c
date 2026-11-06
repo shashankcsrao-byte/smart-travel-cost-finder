@@ -379,7 +379,16 @@ static int plan_metro(OlaClient *maps, const MetroNetwork *metro, const Place *o
                 if (diff < 0) diff += 1440;
                 soon = diff <= MAX_TRAIN_WAIT_MIN;
             }
-            if (soon) {
+            char opens[16];
+            static const char *const MONTHS[] = {"Jan", "Feb", "Mar", "Apr", "May", "Jun",
+                                                 "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"};
+            int oy, om, od;
+            if (!has && metro_opens_after(metro, wait_station, wait_at, opens) &&
+                sscanf(opens, "%4d%2d%2d", &oy, &om, &od) == 3 && om >= 1 && om <= 12) {
+                /* The nearest stations are on a line that has not opened yet. */
+                snprintf(reason, reason_len, "%s opens on %d %s %d; no train runs from it before then",
+                         metro->stations[wait_station].name, od, MONTHS[om - 1], oy);
+            } else if (soon) {
                 /* A train is coming, but the connections needed to finish the trip have stopped. */
                 snprintf(reason, reason_len, "Too late to finish this trip by metro tonight (the last connection has gone)");
             } else if (has) {

@@ -74,7 +74,7 @@
     official: "Official fare", regulated: "Govt rate", estimated: "Estimated", partial: "Partial fare data",
     indicative: "Indicative", sample: "Sample data", free: "Free",
   };
-  const MODE_STROKE = { bus: "#E8EAF0", metro: "#B9A6F2", bike_taxi: "#3DDC97", car_taxi: "#FF7AB6" };   // read on a dark map
+  const MODE_STROKE = { bus: "#FF6961", metro: "#DA8FFF", bike_taxi: "#5CE1E6", car_taxi: "#FF6482" };   // read on the dark map
   const fareText = (o) => (o.fare_kind === "estimated" ? `≈ ${rupees(o.fare)}` : o.fare_kind === "partial" ? `${rupees(o.fare)}+` : o.fare === 0 ? "Free" : rupees(o.fare));
   const isLight = (hex) => /^#?FFDF00$/i.test(hex || "");      // the Yellow Line needs dark text
 
@@ -152,10 +152,6 @@
     store.set(recentKey(), list.slice(0, 8));
   }
   const savedTrips = () => store.get("stcf-saved", []).filter((t) => t.mode === S.mode);
-  function isSaved() {
-    if (!S.from || !S.to) return false;
-    return savedTrips().some((t) => tripKey(t) === tripKey({ from: S.from, to: S.to }));
-  }
   function knownPlaces() {
     const seen = new Set(), out = [];
     [...savedTrips(), ...store.get(recentKey(), [])].forEach((t) => [t.from, t.to].forEach((p) => {
@@ -422,14 +418,13 @@
     } else {
       $("#results-meta").innerHTML = `${icon("info")}Demo city · sample data`;
     }
-    $("#save-trip").setAttribute("aria-pressed", String(isSaved()));
 
     const cards = r.options.map((o, i) => {
       const sel = o.id === S.sel;
       const alts = r.kind === "demo" && o.variant === "cheapest"
         ? `<button type="button" class="app rp-host alts-btn" data-alts="${esc(o.mode)}">${icon("alt_route")}Other routes</button><ol class="alts" hidden></ol>` : "";
       return `
-      <li class="opt${sel ? " is-sel" : ""}" data-id="${esc(o.id)}" style="--i:${i}">
+      <li class="opt${sel ? " is-sel" : ""}" data-id="${esc(o.id)}" data-mode="${esc(o.mode)}" style="--i:${i}">
         <button type="button" class="opt__main rp-host" aria-expanded="${sel}" aria-controls="more-${esc(o.id)}">
           <span class="opt__icon">${icon(MODE_ICON[o.mode] || "route")}</span>
           <span class="opt__body">
@@ -448,7 +443,7 @@
       </li>`;
     });
     const off = r.unavailable.map((u, i) => `
-      <li class="opt opt--off" style="--i:${r.options.length + i}">
+      <li class="opt opt--off" data-mode="${esc(u.mode)}" style="--i:${r.options.length + i}">
         <div class="opt__main"><span class="opt__icon">${icon(MODE_ICON[u.mode] || "route")}</span>
           <span class="opt__body"><span class="opt__title">${esc(u.label)}</span><span class="opt__meta">${esc(u.reason)}</span></span>
           <span class="opt__fare">Not available</span></div>
@@ -534,9 +529,33 @@
     $("#map-cap").innerHTML = `${icon(MODE_ICON[o.mode] || "near_me", "", true)}<span><b>${esc(o.label)}</b> · ${esc(r.origin.name)} → ${esc(r.destination.name)} · ${minutes(o.time_min)} · ${fareText(o)}</span>`;
   }
 
+  // Leaflet (its script, styles and tiles) loads only when the map nears the screen,
+  // so the first view downloads and parses less.
+  let mapNear = false;
+  function loadLeaflet() {
+    if (typeof L !== "undefined") return Promise.resolve();
+    const add = (tag, attrs) => new Promise((resolve) => {
+      const el = Object.assign(document.createElement(tag), attrs);
+      el.onload = el.onerror = () => resolve();                  // a failure shows the "could not load" panel
+      document.head.append(el);
+    });
+    return Promise.all([
+      add("link", { rel: "stylesheet", href: "vendor/leaflet/leaflet.css" }),
+      add("script", { src: "vendor/leaflet/leaflet.js" }),
+    ]);
+  }
+  new IntersectionObserver(([entry], io) => {
+    if (!entry.isIntersecting) return;
+    io.disconnect();
+    loadLeaflet().then(() => {
+      mapNear = true;
+      try { drawHeroMap(); } catch (err) { console.error(err); }
+    });
+  }, { rootMargin: "300px 0px" }).observe($("#hero-map"));
+
   function drawHeroMap() {
     const r = S.result;
-    if (!r) return;
+    if (!r || !mapNear) return;
     const o = r.options.find((x) => x.id === S.sel) || r.options[0];
     if (!o) return;
     captionFor(o);
@@ -552,7 +571,7 @@
     if (S.map) return true;
     host.innerHTML = "";
     S.map = L.map(host, {
-      scrollWheelZoom: false, zoomControl: true, attributionControl: true,
+      scrollWheelZoom: false, zoomControl: false, attributionControl: true,   // the route fits itself; double-click still zooms
       dragging: !L.Browser.mobile, tap: false,                  // one finger scrolls the page on phones
     }).setView([12.97, 77.6], 12);
     L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png", {
@@ -602,7 +621,7 @@
       let cursor = a;
       o.legs.forEach((leg, i) => {
         if (leg.kind === "metro") {
-          L.polyline(leg.coords, { color: safeColor(leg.color), weight: 7, opacity: 0.95 }).addTo(S.layers);
+          L.polyline(leg.coords, { color: safeColor(leg.color), weight: 7, opacity: 0.95, className: "route-draw" }).addTo(S.layers);
           leg.coords.forEach((c) => L.circleMarker(c, { radius: 3, color: "#fff", weight: 1, fillColor: safeColor(leg.color), fillOpacity: 1 }).addTo(S.layers));
           pts.push(...leg.coords);
           cursor = leg.coords[leg.coords.length - 1];
@@ -610,12 +629,13 @@
           const next = o.legs[i + 1];
           const end = i === 0 && next && next.coords ? next.coords[0] : b;
           const start = i === 0 ? a : cursor;
-          L.polyline([start, end], { color: leg.kind === "walk" ? "#F5F6FA" : "#FADF63", weight: 4, dashArray: "6 8" }).addTo(S.layers);
+          L.polyline([start, end], { color: leg.kind === "walk" ? "#F5F5F7" : "#2997FF", weight: 4, dashArray: "6 8", className: "route-march" }).addTo(S.layers);
         }
       });
     } else {
       const path = roadPath(r);
-      L.polyline(path, { color: "#F5F6FA", weight: 7, opacity: 0.9, dashArray: o.mode === "bus" || o.mode === "walk" ? "12 9" : null }).addTo(S.layers);
+      const dashed = o.mode === "bus" || o.mode === "walk";      // dashed lines march, solid ones draw on (styles.css)
+      L.polyline(path, { color: "#2997FF", weight: 6, opacity: 0.9, dashArray: dashed ? "12 9" : null, className: dashed ? "route-march" : "route-draw" }).addTo(S.layers);
       pts.push(...path);
     }
     const pin = (cls) => L.divIcon({ className: "", html: `<div class="pin ${cls}"></div>`, iconSize: [26, 26], iconAnchor: [13, 13] });
@@ -649,7 +669,7 @@
       parts.push(`<line class="dm-edge${metro ? " dm-edge--metro" : ""}" x1="${pos[a][0]}" y1="${pos[a][1]}" x2="${pos[b][0]}" y2="${pos[b][1]}"/>`);
     }
     (o.legs || []).forEach((leg) => {
-      const color = o.variant === "mixed" ? (MODE_STROKE[leg.mode] || "#FADF63") : "#FADF63";
+      const color = o.variant === "mixed" ? (MODE_STROKE[leg.mode] || "#2997FF") : "#2997FF";
       parts.push(`<line class="dm-route" style="stroke:${color}" x1="${pos[leg.from][0]}" y1="${pos[leg.from][1]}" x2="${pos[leg.to][0]}" y2="${pos[leg.to][1]}"/>`);
     });
     const ends = [r.origin.name, r.destination.name];
@@ -688,19 +708,6 @@
     if (!chip) return;
     const c = S.chips[Number(chip.dataset.i)];
     setTrip(c.from, c.to);
-  });
-
-  $("#save-trip").addEventListener("click", () => {
-    if (!S.from || !S.to) return;
-    const all = store.get("stcf-saved", []);
-    const key = tripKey({ from: S.from, to: S.to });
-    const exists = all.some((t) => t.mode === S.mode && tripKey(t) === key);
-    const next = exists ? all.filter((t) => !(t.mode === S.mode && tripKey(t) === key))
-      : [{ mode: S.mode, from: S.from, to: S.to }, ...all].slice(0, 12);
-    store.set("stcf-saved", next);
-    $("#save-trip").setAttribute("aria-pressed", String(!exists));
-    snack(exists ? "Removed from saved trips" : "Saved: it is now one tap away");
-    renderChips();
   });
 
   function tripUrl() {
@@ -1087,8 +1094,6 @@
     const k = Math.max(-1, Math.min(N, (P.done ? N : P.step) + delta));
     scrollToProgress(pOf(k, N));
   }
-  $("#step-back").addEventListener("click", () => step(-1));
-  $("#step-next").addEventListener("click", () => step(1));
 
   let playTimer = null;
   function stopPlay() {
@@ -1137,7 +1142,7 @@
     if (reduce) { $$(".rate").forEach((c) => c.classList.add("is-in")); return; }
     const io = new IntersectionObserver((entries) => entries.forEach((en) => {
       if (en.isIntersecting) { en.target.classList.add("is-in"); io.unobserve(en.target); }
-    }), { threshold: 0.6 });
+    }), { threshold: 0.3 });                                  // low enough that a fast scroll never skips a card
     $$(".rate").forEach((c) => io.observe(c));
   }
 
